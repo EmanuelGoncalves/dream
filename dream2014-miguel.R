@@ -2,18 +2,18 @@ source("dream2014-functions.R")
 
 # Loading expression data
 
-exp.train.raw = read.gct.file("CCLE_expression_training.gct")
+exp.train.raw = read.gct.file("data/CCLE_expression_training.gct")
 dim(exp.train.raw)
 #18960  47
 
-exp.leader.raw = read.gct.file("CCLE_expression_leaderboard.gct")
+exp.leader.raw = read.gct.file("data/CCLE_expression_leaderboard.gct")
 dim(exp.leader.raw)
 # 18960 24
 
 sum(duplicated(exp.train.raw$Description))
 # 299 genes have more than one probe
 
-exp.annot = read.annotations("CCLE_expression_gene_annotations.txt")
+exp.annot = read.annotations("data/CCLE_expression_gene_annotations.txt")
 dim(exp.annot)
 # 18960     2
 
@@ -26,7 +26,7 @@ boxplot(exp.train.raw[,3:47])
 
 # Loading copy number data
 
-cn.train.raw = read.gct.file("CCLE_copynumber_training.gct")
+cn.train.raw = read.gct.file("data/CCLE_copynumber_training.gct")
 dim(cn.train.raw)
 # [1] 23288    47
 head(cn.train.raw)
@@ -35,11 +35,11 @@ which(cn.train.raw$Name != cn.train.raw$Description)
 sum(duplicated(cn.train.raw$Name))
 # no duplicates
 
-cn.leader.raw = read.gct.file("CCLE_copynumber_leaderboard.gct")
+cn.leader.raw = read.gct.file("data/CCLE_copynumber_leaderboard.gct")
 dim(cn.leader.raw)
 # 23288 24
 
-cn.annot = read.annotations("CCLE_copynumber_gene_annotations.txt")
+cn.annot = read.annotations("data/CCLE_copynumber_gene_annotations.txt")
 dim(cn.annot)
 # 21217     4
 head(cn.annot)
@@ -53,7 +53,7 @@ boxplot(cn.train.raw[,3:47])
 
 # Loading scores
 
-scores.train.raw = read.gct.file("Achilles_v2.9_training.gct")
+scores.train.raw = read.gct.file("data/Achilles_v2.9_training.gct")
 dim(scores.train.raw)
 #[1] 14557    47
 head(scores.train.raw)
@@ -90,7 +90,7 @@ length(genesWithoutInfo)
 
 # kNN example results
 
-knn.results.raw = read.gct.file("knn_k_3_gene_expression_leaderboard_prediction.gct")
+knn.results.raw = read.gct.file("submissions/knn_k_3_gene_expression_leaderboard_prediction.gct")
 dim(knn.results.raw)
 # 14557    24
 
@@ -143,7 +143,7 @@ for (g in 1:ncol(output.tr.mat) ) {
   res.knn.1[,g] = res.knn.gene$pred
 }
 
-write.res.gct(res.knn.1, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "res.knn.1.gct")
+write.res.gct(res.knn.1, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/res.knn.1.gct")
 
 res.knn.3 = matrix(NA, nrow(input.ts.mat), ncol(output.tr.mat))
 for (g in 1:ncol(output.tr.mat) ) {
@@ -151,7 +151,7 @@ for (g in 1:ncol(output.tr.mat) ) {
   res.knn.3[,g] = res.knn.gene$pred
 }
 
-write.res.gct(res.knn.3, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm1.gct")
+write.res.gct(res.knn.3, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm1.gct")
 
 # own kNN approach - based on correlations (much faster)
 
@@ -164,7 +164,7 @@ for(cl in 1:nrow(correl.mat)) {
   res.our.knn[cl,] = colMeans(output.tr.mat[bestK,])
 }
 
-write.res.gct(res.our.knn, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm2.gct")
+write.res.gct(res.our.knn, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm2.gct")
   
 k = 11
 res.our.knn.11 = matrix(NA, nrow(input.ts.mat), ncol(output.tr.mat))
@@ -173,7 +173,7 @@ for(cl in 1:nrow(correl.mat)) {
   res.our.knn.11[cl,] = colMeans(output.tr.mat[bestK,])
 }
 
-write.res.gct(res.our.knn.11, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm3.gct")
+write.res.gct(res.our.knn.11, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm3.gct")
 
 correl.mat.norm = cor(t(scale(norm.input.ts.mat)), t(scale(norm.input.tr.mat)), method = "spearman")
 
@@ -184,7 +184,7 @@ for(cl in 1:nrow(correl.mat.norm)) {
   res.our.knn.11.v2[cl,] = colMeans(output.tr.mat[bestK,])
 }
 
-write.res.gct(res.our.knn.11.v2, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm3-2.gct")
+write.res.gct(res.our.knn.11.v2, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm3-2.gct")
 
 
 # trying SVMs 
@@ -201,7 +201,7 @@ for (g in 1:ncol(output.tr.mat) ) {
   print (g)
 }
 
-write.res.gct(res.svm, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm4-2.gct")
+write.res.gct(res.svm, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm4-2.gct")
 
 res.svm2 = matrix(NA, nrow(input.ts.mat), ncol(output.tr.mat))
 nf = 500
@@ -214,7 +214,7 @@ for (g in 1:ncol(output.tr.mat) ) {
   print (g)
 }
 
-write.res.gct(res.svm, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm4-3.gct")
+write.res.gct(res.svm, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm4-3.gct")
 
 # trying PLS
 
@@ -230,7 +230,7 @@ for (g in 1:ncol(output.tr.mat) ) {
   print (g)
 }
 
-write.res.gct(res.pls, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm5.gct")
+write.res.gct(res.pls, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm5.gct")
 
 # trying lasso
 
@@ -246,4 +246,4 @@ for (g in 1:ncol(output.tr.mat) ) {
   print (g)
 }
 
-write.res.gct(res.lasso, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "umebi-subm6.gct")
+write.res.gct(res.lasso, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm6.gct")
