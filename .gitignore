@@ -6,3 +6,5 @@ emanuel
 .idea/dream.iml
 
 *.xml
+
+*.log
