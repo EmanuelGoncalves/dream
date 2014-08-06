@@ -7,11 +7,24 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, \
-    Lars, OrthogonalMatchingPursuit, BayesianRidge, PassiveAggressiveRegressor
+    BayesianRidge, PassiveAggressiveRegressor, ARDRegression, LogisticRegression
 from time import time
 
 from datasets import load_datasets, load_cell_lines, save_gct_data
 from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD
+
+
+ESTIMATORS = {'knn': KNeighborsRegressor,
+              'svm': SVR,
+              'linreg': LinearRegression,
+              'ridge': Ridge,
+              'lasso': Lasso,
+              'elnet': ElasticNet,
+              'bayr': BayesianRidge,
+              'par': PassiveAggressiveRegressor,
+              'ard': ARDRegression,
+              'logreg': LogisticRegression,
+              }
 
 
 def average_by_cell_line():
@@ -57,28 +70,11 @@ def pre_process_data(X, Z, method='id', method_args={}):
     return X2, Z2
 
 
-def build_estimator(method, method_args):
-
-    estimators = {'knn': KNeighborsRegressor,
-                  'svm': SVR,
-                  'linreg': LinearRegression,
-                  'ridge': Ridge,
-                  'lasso': Lasso,
-                  'elnet': ElasticNet,
-                  'lars': Lars,
-                  'omp': OrthogonalMatchingPursuit,
-                  'bayr': BayesianRidge,
-                  'par': PassiveAggressiveRegressor
-                  }
-
-    return estimators[method](**method_args)
-
-
 def train_and_predict(X, Y, Z, method, method_args):
     W = []
     Y2 = []
 
-    estimator = build_estimator(method, method_args)
+    estimator = ESTIMATORS[method](**method_args)
 
     print '------------------>'
     for i, y in enumerate(Y):
@@ -101,7 +97,7 @@ def training_score(Y, Y2):
 def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_args={}):
     exp_train_data, ess_train_data, exp_board_data = load_datasets()
 
-    #ess_train_data = ess_train_data.head(100)
+    #ess_train_data = ess_train_data.head(10)
 
     X = exp_train_data.values.T
     Y = ess_train_data.values
