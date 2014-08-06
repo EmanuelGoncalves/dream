@@ -8,3 +8,8 @@ emanuel
 *.xml
 
 *.log
+
+.RData
+.Rapp.history
+.Rhistory
+.idea/
