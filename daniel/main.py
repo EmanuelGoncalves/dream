@@ -1,17 +1,19 @@
 __author__ = 'daniel'
 
+from multiprocessing import Pool
 from learning import run_pipeline
+
+def call_pipeline(args):
+    run_pipeline(*args)
 
 def main():
     #average_by_cell_line()
-    #run_pipeline('z-score', 'knn', 'z_min_02_knn_5.gct', {'z_min': 0.2}, {'n_neighbors': 5})
-    #run_pipeline('z-score', 'svm', 'z_min_005_svm.gct', {'z_min': 0.05}, {})
-    #run_pipeline('z-score', 'svm', 'z_min_008_svm.gct', {'z_min': 0.08}, {})
-    #run_pipeline('z-score', 'svm', 'z_min_015_svm.gct', {'z_min': 0.15}, {})
-    #run_pipeline('z-score', 'linreg', 'z_min_02_linreg.gct', {'z_min': 0.2}, {})
-    run_pipeline('z-score', 'linreg', 'z_min_01_linreg.gct', {'z_min': 0.1}, {})
+
+    methods = ['ridge', 'lasso', 'elnet', 'linreg']
+    args = [('z-score', method, 'z_min_01_ridge.gct', {'z_min': 0.08}, {})  for method in methods]
+    p = Pool()
+    p.map(call_pipeline, args)
 
 
 if __name__ == '__main__':
     main()
-    

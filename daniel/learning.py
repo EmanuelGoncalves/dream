@@ -1,13 +1,13 @@
 __author__ = 'daniel'
 
 from pandas import DataFrame
-from numpy import mean, std
-from numpy.random import randn
+from numpy import mean
 from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from time import time
 
 from datasets import load_datasets, load_cell_lines, save_gct_data
 from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD
@@ -53,13 +53,12 @@ def pre_process_data(X, Z, method='id', method_args={}):
     X2 = scaler.transform(X2)
     Z2 = scaler.transform(Z2)
 
-
     return X2, Z2
 
 
-def train_and_predict(X, Y, Z, method, method_args):
-    W = []
-    Y2 = []
+def build_estimator(method, method_args):
+
+    estimator = None
 
     if method == 'knn':
         estimator = KNeighborsRegressor(**method_args)
@@ -70,18 +69,34 @@ def train_and_predict(X, Y, Z, method, method_args):
     if method == 'linreg':
         estimator = LinearRegression(**method_args)
 
+    if method == 'ridge':
+        estimator = Ridge(**method_args)
+
+    if method == 'lasso':
+        estimator = Lasso(**method_args)
+
+    if method == 'elnet':
+        estimator = ElasticNet(**method_args)
+
+    return estimator
+
+
+def train_and_predict(X, Y, Z, method, method_args):
+    W = []
+    Y2 = []
+
+    estimator = build_estimator(method, method_args)
 
     print '------------------>'
     for i, y in enumerate(Y):
         estimator.fit(X, y)
-        y2 = estimator.predict(X)
         w = estimator.predict(Z)
         W.append(w)
-        Y2.append(y2)
+#        y2 = estimator.predict(X)
+#        Y2.append(y2)
         if (i+1) % (len(Y) / 10) == 0:
             print '.',
     print ''
-
 
     return W, Y2
 
@@ -102,11 +117,14 @@ def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_arg
     print 'pre-processing data using method', preprocess
     X2, Z2 = pre_process_data(X, Z, preprocess, pre_process_args)
 
+    t0 = time()
     print 'training and predicting using method', method
-    W, Y2 = train_and_predict(X2, Y, Z2, method, method_args)
+    W, _ = train_and_predict(X2, Y, Z2, method, method_args)
+    t1 = time()
+    print 'elapsed:', t1 - t0
 
-    score = training_score(Y, Y2)
-    print 'score for training dataset:', score
+    # score = training_score(Y, Y2)
+    # print 'score for training dataset:', score
 
     ess_board_data = DataFrame(W,
                                columns=exp_board_data.columns,
