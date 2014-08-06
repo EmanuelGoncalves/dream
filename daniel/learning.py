@@ -6,7 +6,8 @@ from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, \
+    Lars, OrthogonalMatchingPursuit, BayesianRidge, PassiveAggressiveRegressor
 from time import time
 
 from datasets import load_datasets, load_cell_lines, save_gct_data
@@ -58,27 +59,19 @@ def pre_process_data(X, Z, method='id', method_args={}):
 
 def build_estimator(method, method_args):
 
-    estimator = None
+    estimators = {'knn': KNeighborsRegressor,
+                  'svm': SVR,
+                  'linreg': LinearRegression,
+                  'ridge': Ridge,
+                  'lasso': Lasso,
+                  'elnet': ElasticNet,
+                  'lars': Lars,
+                  'omp': OrthogonalMatchingPursuit,
+                  'bayr': BayesianRidge,
+                  'par': PassiveAggressiveRegressor
+                  }
 
-    if method == 'knn':
-        estimator = KNeighborsRegressor(**method_args)
-
-    if method == 'svm':
-        estimator = SVR(**method_args)
-
-    if method == 'linreg':
-        estimator = LinearRegression(**method_args)
-
-    if method == 'ridge':
-        estimator = Ridge(**method_args)
-
-    if method == 'lasso':
-        estimator = Lasso(**method_args)
-
-    if method == 'elnet':
-        estimator = ElasticNet(**method_args)
-
-    return estimator
+    return estimators[method](**method_args)
 
 
 def train_and_predict(X, Y, Z, method, method_args):

@@ -9,8 +9,10 @@ def call_pipeline(args):
 def main():
     #average_by_cell_line()
 
-    methods = ['ridge', 'lasso', 'elnet', 'linreg']
-    args = [('z-score', method, 'z_min_01_ridge.gct', {'z_min': 0.08}, {})  for method in methods]
+    methods = ['bayr', 'par']
+    z_min = [0.1, 0.2]
+    args = [('z-score', method, 'z_min_{0}_{1}.gct'.format(z, method), {'z_min': z}, {})
+            for method in methods for z in z_min]
     p = Pool()
     p.map(call_pipeline, args)
 
