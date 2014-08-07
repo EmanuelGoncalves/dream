@@ -20,8 +20,18 @@ samples <- rownames(achilles.training)
 features <- cbind(exp.train.raw, cn.train.raw)
 leader.features <- cbind(exp.leader.raw, cn.leader.raw)
 
+# Filter features matrices
+train.feature.col.vars <- colVars(features)
+train.feature.quantile <- quantile(train.feature.col.vars, 0.85)
+features <- features[,names(which(train.feature.col.vars > train.feature.quantile))]
+
+leader.feature.col.vars <- colVars(leader.features)
+leader.feature.quantile <- quantile(leader.feature.col.vars, 0.85)
+leader.features <- leader.features[,names(which(leader.feature.col.vars > leader.feature.quantile))]
+
 # Run elastic net and predic leader data-set
-leader.preds <- do.call(rbind, lapply(genes, function (gene) {
+leader.preds <- do.call(rbind, lapply(head(genes), function (gene) {
+  message(gene)
   observation <- achilles.training[, gene]
   
   # 10 fold cross-validation
@@ -40,11 +50,6 @@ leader.preds <- do.call(rbind, lapply(genes, function (gene) {
     obs_xTrain <- observation[cv[[i]]$xTrain]
     
     models[[paste('model_',i,sep='')]] <- trainEN(input_train, obs_train, input_xTrain, obs_xTrain)
-    
-    # predict wiht model
-    # input_test <- features[cv[[i]]$test,]
-    # pred <- c(pred, predictEN(models[[i]], input_test))
-    # obs <- c(obs, observation[cv[[i]]$test])
   }
   
   leader.pred <- do.call(cbind, lapply(1:nFold, function (i) {

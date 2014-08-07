@@ -18,10 +18,8 @@
 "write.res.gct" = function(out.mat, gene.names, cell.line.names, outfile = "output.txt") {
   sink(outfile)
   cat("#1.2\n")
-  cat(ncol(out.mat), "\t",  nrow(out.mat), "\n")
+  cat(paste(nrow(out.mat), '\t',  ncol(out.mat), '\n', sep=''))
   sink()
-  mat.res = t(out.mat)
-  colnames(mat.res) = cell.line.names
-  df = data.frame(Name = gene.names, Description = gene.names, mat.res)
+  df = data.frame(Name = gene.names, Description = gene.names, signif(out.mat, digits=4))
   write.table(df, file = outfile, append = T, sep = "\t", row.names = F, col.names = T, quote = F)
 }

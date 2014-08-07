@@ -25,7 +25,7 @@ def save_gct_data(dataframe, filename, folder=RESULTS_FOLDER):
     dataframe.to_csv(folder + 'temp.csv', sep='\t')
     with open(folder + 'temp.csv', 'r') as file1:
         with open(folder + filename, 'w') as file2:
-            file2.write('#1.0\n')
+            file2.write('#1.2\n')
             file2.write('{0}\t{1}\n'.format(dataframe.shape[0], dataframe.shape[1] - 1))
             for line in file1:
                 file2.write(line)

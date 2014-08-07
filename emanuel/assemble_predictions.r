@@ -21,4 +21,4 @@ print(dim(predictions))
 predictions <- predictions[genes, samples]
 print(dim(predictions))
 
-write.res.gct(predictions, rownames(predictions), colnames(predictions), outfile=paste(wd, 'submissions/umebi_emanuel_6.gct',sep=''))
+write.res.gct(predictions, rownames(predictions), colnames(predictions), outfile=paste(wd, 'submissions/umebi_emanuel_21.gct',sep=''))

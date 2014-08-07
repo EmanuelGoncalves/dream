@@ -25,6 +25,15 @@ samples <- rownames(achilles.training)
 features <- cbind(exp.train.raw, cn.train.raw, train.tissue.feature, train.tumour.feature)
 leader.features <- cbind(exp.leader.raw, cn.leader.raw, leader.tissue.feature, leader.tumour.feature)
 
+# Filter features matrices
+train.feature.col.vars <- colVars(features)
+train.feature.quantile <- quantile(train.feature.col.vars, 0.85)
+features <- features[,names(which(train.feature.col.vars > train.feature.quantile))]
+
+leader.feature.col.vars <- colVars(leader.features)
+leader.feature.quantile <- quantile(leader.feature.col.vars, 0.85)
+leader.features <- leader.features[,names(which(leader.feature.col.vars > leader.feature.quantile))]
+
 observation <- achilles.training[, gene]
 
 # 10 fold cross-validation
@@ -49,7 +58,7 @@ leader.pred <- do.call(cbind, lapply(1:nFold, function (i) {
   predictEN(models[[i]], leader.features)
 }))
 
-leader.pred <- rowMedians(leader.pred)
+leader.pred <- rowMeans(leader.pred)
 
 leader.pred <- t(as.matrix(leader.pred))
 rownames(leader.pred) <- gene
