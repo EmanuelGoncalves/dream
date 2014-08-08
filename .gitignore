@@ -13,3 +13,5 @@ emanuel
 .Rapp.history
 .Rhistory
 .idea/
+
+*.pyc

@@ -1,10 +1,13 @@
 __author__ = 'daniel'
 
 from pandas import read_csv
+from synapseclient import Synapse, Project, File
 
-SC1_DATA = '../data/'
+PROJECT_ID = 'syn2549343'
+TEAM = 'UM-EBI'
 
 RESULTS_FOLDER = '../submissions/'
+SC1_DATA = '../data/'
 
 CNV_TRAINING_DATA = SC1_DATA + 'CCLE_copynumber_training.gct'
 EXP_TRAINING_DATA = SC1_DATA + 'CCLE_expression_training.gct'
@@ -46,3 +49,14 @@ def load_datasets():
     del exp_board_data['Description']
 
     return exp_train_data, ess_train_data, exp_board_data
+
+def submit_to_challenge(filename, challenge, label):
+
+    codes = {'sc1': '2468319', 'sc2': '2468322', 'sc3': '2482339'}
+    client = Synapse()
+    client.login()
+    evaluation = client.getEvaluation(codes[challenge])
+#    client.joinEvaluation(evaluation)
+    myfile = File(RESULTS_FOLDER + filename, parent=PROJECT_ID)
+    myfile = client.store(myfile)
+    client.submit(evaluation, myfile, name=label, teamName=TEAM)

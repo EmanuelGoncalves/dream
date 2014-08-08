@@ -6,24 +6,38 @@ from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, \
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, LassoCV, ElasticNetCV, \
     BayesianRidge, PassiveAggressiveRegressor, ARDRegression, LogisticRegression
+from sklearn.gaussian_process import GaussianProcess
+from sklearn.cross_decomposition import PLSRegression
+from sklearn.naive_bayes import GaussianNB
+from sklearn.tree import DecisionTreeRegressor
+from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.isotonic import IsotonicRegression
 from time import time
 
-from datasets import load_datasets, load_cell_lines, save_gct_data
+from datasets import load_datasets, load_cell_lines, save_gct_data, submit_to_challenge
 from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD
 
 
-ESTIMATORS = {'knn': KNeighborsRegressor,
+ESTIMATORS = {'knn': KNeighborsRegressor,  # low scores
               'svm': SVR,
-              'linreg': LinearRegression,
-              'ridge': Ridge,
-              'lasso': Lasso,
-              'elnet': ElasticNet,
+              'lr': LinearRegression,
+              'rdg': Ridge,
+              'lss': Lasso,  # std = 0
+              'eln': ElasticNet,  # std = 0
+              'lsscv': LassoCV,  # std = 0
+              'elncv': ElasticNetCV,  # std = 0
               'bayr': BayesianRidge,
               'par': PassiveAggressiveRegressor,
-              'ard': ARDRegression,
-              'logreg': LogisticRegression,
+              'ard': ARDRegression,  # too slow
+              'logr': LogisticRegression,  # too slow
+              'gss': GaussianProcess,  # std = 0
+              'gssnb': GaussianNB,  # std = 0
+              'pls': PLSRegression, #fails
+              'tree': DecisionTreeRegressor, # low scores
+              'gbr': GradientBoostingRegressor,  #too slow
+              'iso': IsotonicRegression  # fails
               }
 
 
@@ -72,48 +86,41 @@ def pre_process_data(X, Z, method='id', method_args={}):
 
 def train_and_predict(X, Y, Z, method, method_args):
     W = []
-    Y2 = []
-
     estimator = ESTIMATORS[method](**method_args)
 
-    print '------------------>'
+#    print '------------------>'
     for i, y in enumerate(Y):
         estimator.fit(X, y)
         w = estimator.predict(Z)
         W.append(w)
-#        y2 = estimator.predict(X)
-#        Y2.append(y2)
         if (i+1) % (len(Y) / 10) == 0:
             print '.',
-    print ''
+    print
 
-    return W, Y2
+    return W
 
 
 def training_score(Y, Y2):
     return mean([spearmanr(y, y2)[0] for y, y2 in zip(Y, Y2)])
 
 
-def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_args={}):
+def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_args={}, submit_to=None):
     exp_train_data, ess_train_data, exp_board_data = load_datasets()
 
-    #ess_train_data = ess_train_data.head(10)
+    #ess_train_data = ess_train_data.head(100)
 
     X = exp_train_data.values.T
     Y = ess_train_data.values
     Z = exp_board_data.values.T
 
-    print 'pre-processing data using method', preprocess
+    print 'pre-processing data using method', preprocess, str(pre_process_args)
     X2, Z2 = pre_process_data(X, Z, preprocess, pre_process_args)
 
     t0 = time()
-    print 'training and predicting using method', method
-    W, _ = train_and_predict(X2, Y, Z2, method, method_args)
-    t1 = time()
-    print 'elapsed:', t1 - t0
-
-    # score = training_score(Y, Y2)
-    # print 'score for training dataset:', score
+    print 'training and predicting using method', method, str(method_args)
+    W = train_and_predict(X2, Y, Z2, method, method_args)
+    t1 = time() - t0
+    print 'tested', method, str(method_args), 'scored:', 'elapsed', t1, 'secs'
 
     ess_board_data = DataFrame(W,
                                columns=exp_board_data.columns,
@@ -121,3 +128,36 @@ def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_arg
 
     ess_board_data.insert(0, 'Description', ess_train_data.index)
     save_gct_data(ess_board_data, outputfile)
+
+    if submit_to:
+        label = 'daniel_' + outputfile[:-4]
+        submit_to_challenge(outputfile, submit_to, label)
+
+
+
+def score_from_training_set(preprocess, method, pre_process_args={}, method_args={}):
+    exp_train_data, ess_train_data, _ = load_datasets()
+
+    exp_score_data = exp_train_data.iloc[:,2::3]
+    exp_train_data = exp_train_data.iloc[:,::3].join(exp_train_data.iloc[:,1::3])
+
+    ess_score_data = ess_train_data.iloc[:,2::3]
+    ess_train_data = ess_train_data.iloc[:,::3].join(ess_train_data.iloc[:,1::3])
+
+
+    X = exp_train_data.values.T
+    Y = ess_train_data.values
+    Z = exp_score_data.values.T
+    W = ess_score_data.values
+
+    print 'pre-processing data using', preprocess, str(pre_process_args)
+    X, Z = pre_process_data(X, Z, preprocess, pre_process_args)
+
+    t0 = time()
+    print 'training and predicting using', method, str(method_args)
+    W2 = train_and_predict(X, Y, Z, method, method_args)
+    t1 = time() - t0
+
+    score = training_score(W, W2)
+
+    print 'tested', method, str(method_args), 'scored:', score, 'elapsed', t1, 'secs'
