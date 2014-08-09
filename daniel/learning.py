@@ -14,10 +14,11 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.isotonic import IsotonicRegression
+from sklearn.feature_selection import RFE
 from time import time
 
-from datasets import load_datasets, load_cell_lines, save_gct_data, submit_to_challenge
-from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD
+from datasets import load_datasets, load_cell_lines, save_gct_data, submit_to_challenge, load_gene_list, zip_files
+from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD, PRIORITY_GENE_LIST, RESULTS_FOLDER
 
 
 ESTIMATORS = {'knn': KNeighborsRegressor,  # low scores
@@ -83,12 +84,27 @@ def pre_process_data(X, Z, method='id', method_args={}):
 
     return X2, Z2
 
+def pre_process_datasets(train_data, board_data, method='id', method_args={}):
+
+    if method == 'id':
+        train_data, board_data
+
+    if method == 'z-score':
+        z_score = train_data.std(1).values / train_data.mean(1).values
+        train_data = train_data.loc[z_score > method_args['z_min'], :]
+        board_data = board_data.loc[z_score > method_args['z_min'], :]
+
+
+    scaler = StandardScaler().fit(train_data.values.T)
+    train_data.values[:,:] = scaler.transform(train_data.values.T).T
+    board_data.values[:,:] = scaler.transform(board_data.values.T).T
+
+    return train_data, board_data
 
 def train_and_predict(X, Y, Z, method, method_args):
     W = []
     estimator = ESTIMATORS[method](**method_args)
 
-#    print '------------------>'
     for i, y in enumerate(Y):
         estimator.fit(X, y)
         w = estimator.predict(Z)
@@ -104,7 +120,7 @@ def training_score(Y, Y2):
     return mean([spearmanr(y, y2)[0] for y, y2 in zip(Y, Y2)])
 
 
-def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_args={}, submit_to=None):
+def run_pipeline_sc1(preprocess, method, outputfile, pre_process_args={}, method_args={}, submit=False):
     exp_train_data, ess_train_data, exp_board_data = load_datasets()
 
     #ess_train_data = ess_train_data.head(100)
@@ -129,10 +145,9 @@ def run_pipeline(preprocess, method, outputfile, pre_process_args={}, method_arg
     ess_board_data.insert(0, 'Description', ess_train_data.index)
     save_gct_data(ess_board_data, outputfile)
 
-    if submit_to:
+    if submit:
         label = 'daniel_' + outputfile[:-4]
-        submit_to_challenge(outputfile, submit_to, label)
-
+        submit_to_challenge(outputfile, 'sc1', label)
 
 
 def score_from_training_set(preprocess, method, pre_process_args={}, method_args={}):
@@ -140,6 +155,8 @@ def score_from_training_set(preprocess, method, pre_process_args={}, method_args
 
     exp_score_data = exp_train_data.iloc[:,2::3]
     exp_train_data = exp_train_data.iloc[:,::3].join(exp_train_data.iloc[:,1::3])
+
+    ess_train_data = ess_train_data.head(100)
 
     ess_score_data = ess_train_data.iloc[:,2::3]
     ess_train_data = ess_train_data.iloc[:,::3].join(ess_train_data.iloc[:,1::3])
@@ -161,3 +178,67 @@ def score_from_training_set(preprocess, method, pre_process_args={}, method_args
     score = training_score(W, W2)
 
     print 'tested', method, str(method_args), 'scored:', score, 'elapsed', t1, 'secs'
+
+
+def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args):
+    W = []
+    features = []
+
+    if estimator_method == 'svm':
+        estimator_args['kernel'] = 'linear'
+
+    estimator = ESTIMATORS[estimator_method](**estimator_args)
+
+    if selection_method == 'RFE':
+        selector = RFE(estimator=estimator, n_features_to_select=10, **selection_args)
+
+    for i, y in enumerate(Y):
+        selector = selector.fit(X, y)
+        features.append(feature_list[selector.support_])
+        w = selector.predict(Z)
+        W.append(w)
+        if (i+1) % (len(Y) / 10) == 0:
+            print '.',
+    print
+
+
+    return W, features
+
+
+def run_pipeline_sc2(selection_method, estimator_method, outputfile, selection_args={}, estimator_args={}, z_min=0, submit=False):
+    exp_train_data, ess_train_data, exp_board_data = load_datasets()
+    gene_list = load_gene_list(PRIORITY_GENE_LIST)
+
+    exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, 'z-score', {'z_min': z_min})
+
+    X = exp_train_data.values.T
+    Y = ess_train_data.loc[gene_list, :].values
+    Z = exp_board_data.values.T
+    feature_list = exp_board_data.index.values
+
+
+    print 'selection with', selection_method, str(selection_args)
+    print 'prediction with', estimator_method, str(estimator_args)
+
+    t0 = time()
+    W, features = select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args)
+    t1 = time() - t0
+    print 'elasped', t1
+
+    ess_board_data = DataFrame(W,
+                               columns=exp_board_data.columns,
+                               index=gene_list)
+    ess_board_data.index.name = 'Name'
+
+    ess_board_data.insert(0, 'Description', gene_list)
+    save_gct_data(ess_board_data, outputfile + '.gct')
+
+    features_data = DataFrame(features, index=gene_list)
+    features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False)
+
+    zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
+
+    if submit:
+        label = 'daniel_' + outputfile
+        submit_to_challenge(outputfile + '.zip', 'sc2', label)
+
