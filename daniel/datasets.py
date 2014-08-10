@@ -1,19 +1,23 @@
 __author__ = 'daniel'
 
+from zipfile import ZipFile
 from pandas import read_csv
+from synapseclient import Synapse, Project, File
 
-SC1_DATA = '../data/'
+PROJECT_ID = 'syn2549343'
+TEAM = 'UM-EBI'
 
 RESULTS_FOLDER = '../submissions/'
+SC1_DATA = '../data/'
 
 CNV_TRAINING_DATA = SC1_DATA + 'CCLE_copynumber_training.gct'
 EXP_TRAINING_DATA = SC1_DATA + 'CCLE_expression_training.gct'
 ESS_TRAINING_DATA = SC1_DATA + 'Achilles_v2.9_training.gct'
 CELL_LINES_TRAINING = SC1_DATA + 'Cell_line_annotation_training.txt'
-
 CNV_LEADERBOARD_DATA = SC1_DATA + 'CCLE_copynumber_leaderboard.gct'
 EXP_LEADERBOARD_DATA = SC1_DATA + 'CCLE_expression_leaderboard.gct'
 CELL_LINES_LEADERBOARD = SC1_DATA + 'Cell_line_annotation_leaderboard.txt'
+PRIORITY_GENE_LIST = SC1_DATA + 'prioritized_gene_list.txt'
 
 
 def load_gct_data(filename):
@@ -35,6 +39,10 @@ def load_cell_lines(filename):
     data = read_csv(filename, sep='\t', header=0, index_col=0)
     return data
 
+def load_gene_list(filename):
+    data = read_csv(filename, header=None)
+    return data.values[:,0]
+
 
 def load_datasets():
     exp_train_data = load_gct_data(EXP_TRAINING_DATA)
@@ -46,3 +54,20 @@ def load_datasets():
     del exp_board_data['Description']
 
     return exp_train_data, ess_train_data, exp_board_data
+
+def submit_to_challenge(filename, challenge, label):
+
+    codes = {'sc1': '2468319', 'sc2': '2468322', 'sc3': '2482339'}
+    client = Synapse()
+    client.login()
+    evaluation = client.getEvaluation(codes[challenge])
+#    client.joinEvaluation(evaluation)
+    myfile = File(RESULTS_FOLDER + filename, parent=PROJECT_ID)
+    myfile = client.store(myfile)
+    client.submit(evaluation, myfile, name=label, teamName=TEAM)
+
+def zip_files(output, filelist):
+    zipfile = ZipFile(RESULTS_FOLDER + output + '.zip', 'w')
+    for filename in filelist:
+        zipfile.write(RESULTS_FOLDER + filename, arcname=filename)
+    zipfile.close()

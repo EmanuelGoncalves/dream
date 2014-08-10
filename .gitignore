@@ -12,3 +12,5 @@
 .Rapp.history
 .Rhistory
 .idea/
+
+*.pyc
