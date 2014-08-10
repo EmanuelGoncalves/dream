@@ -7,14 +7,14 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, LassoCV, ElasticNetCV, \
-    BayesianRidge, PassiveAggressiveRegressor, ARDRegression, LogisticRegression
+    BayesianRidge, PassiveAggressiveRegressor, ARDRegression, LogisticRegression, MultiTaskLasso, RidgeCV
 from sklearn.gaussian_process import GaussianProcess
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.naive_bayes import GaussianNB
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.isotonic import IsotonicRegression
-from sklearn.feature_selection import RFE
+from sklearn.feature_selection import RFE, SelectKBest, f_regression
 from time import time
 
 from datasets import load_datasets, load_cell_lines, save_gct_data, submit_to_challenge, load_gene_list, zip_files
@@ -25,7 +25,9 @@ ESTIMATORS = {'knn': KNeighborsRegressor,  # low scores
               'svm': SVR,
               'lr': LinearRegression,
               'rdg': Ridge,
+              'rdgcv': RidgeCV,
               'lss': Lasso,  # std = 0
+              'mlss': MultiTaskLasso,  # std = 0
               'eln': ElasticNet,  # std = 0
               'lsscv': LassoCV,  # std = 0
               'elncv': ElasticNetCV,  # std = 0
@@ -184,7 +186,7 @@ def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_
     W = []
     features = []
 
-    if estimator_method == 'svm':
+    if estimator_method == 'svm' and selection_method == 'RFE':
         estimator_args['kernel'] = 'linear'
 
     estimator = ESTIMATORS[estimator_method](**estimator_args)
@@ -192,14 +194,28 @@ def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_
     if selection_method == 'RFE':
         selector = RFE(estimator=estimator, n_features_to_select=10, **selection_args)
 
-    for i, y in enumerate(Y):
-        selector = selector.fit(X, y)
-        features.append(feature_list[selector.support_])
-        w = selector.predict(Z)
-        W.append(w)
-        if (i+1) % (len(Y) / 10) == 0:
-            print '.',
-    print
+        for i, y in enumerate(Y):
+            selector = selector.fit(X, y)
+            features.append(feature_list[selector.support_])
+            w = selector.predict(Z)
+            W.append(w)
+            if (i+1) % (len(Y) / 10) == 0:
+                print '.',
+        print
+
+    if selection_method == 'KBest':
+        selector = SelectKBest(f_regression, k=10)
+        for i, y in enumerate(Y):
+            selector.fit(X, y)
+            features.append(feature_list[selector.get_support(indices=True)])
+            X = X[:,selector.get_support(indices=True)]
+            Z = Z[:,selector.get_support(indices=True)]
+            estimator.fit(X, y)
+            w = estimator.predict(Z)
+            W.append(w)
+            if (i+1) % (len(Y) / 10) == 0:
+                print '.',
+        print
 
 
     return W, features
@@ -241,4 +257,60 @@ def run_pipeline_sc2(selection_method, estimator_method, outputfile, selection_a
     if submit:
         label = 'daniel_' + outputfile
         submit_to_challenge(outputfile + '.zip', 'sc2', label)
+
+
+def select_features(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args):
+
+    if estimator_method == 'svm':
+        estimator_args['kernel'] = 'linear'
+
+    estimator = ESTIMATORS[estimator_method](**estimator_args)
+
+    if selection_method == 'RFE':
+        selector = RFE(estimator=estimator, n_features_to_select=100, **selection_args)
+
+    selector = selector.fit(X, Y)
+    features = feature_list[selector.support_]
+    W = selector.predict(Z)
+
+    return W, features
+
+
+
+def run_pipeline_sc3(selection_method, estimator_method, outputfile, selection_args={}, estimator_args={}, z_min=0, submit=False):
+    exp_train_data, ess_train_data, exp_board_data = load_datasets()
+    gene_list = load_gene_list(PRIORITY_GENE_LIST)
+
+    exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, 'z-score', {'z_min': z_min})
+
+    X = exp_train_data.values.T
+    Y = ess_train_data.loc[gene_list, :].values.T
+    Z = exp_board_data.values.T
+    feature_list = exp_board_data.index.values
+
+
+    print 'selection with', selection_method, str(selection_args)
+    print 'prediction with', estimator_method, str(estimator_args)
+
+    t0 = time()
+    W, features = select_features(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args)
+    t1 = time() - t0
+    print 'elasped', t1
+
+    ess_board_data = DataFrame(W.T,
+                               columns=exp_board_data.columns,
+                               index=gene_list)
+    ess_board_data.index.name = 'Name'
+
+    ess_board_data.insert(0, 'Description', gene_list)
+    save_gct_data(ess_board_data, outputfile + '.gct')
+
+    features_data = DataFrame([features])
+    features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False, index=False)
+
+    zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
+
+    if submit:
+        label = 'daniel_' + outputfile
+        submit_to_challenge(outputfile + '.zip', 'sc3', label)
 

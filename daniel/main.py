@@ -1,7 +1,7 @@
 __author__ = 'daniel'
 
 from multiprocessing import Pool
-from learning import run_pipeline_sc1, score_from_training_set, run_pipeline_sc2
+from learning import run_pipeline_sc1, score_from_training_set, run_pipeline_sc2, run_pipeline_sc3
 
 
 def run_sc1(args):
@@ -43,18 +43,19 @@ def train_set_score_parallel():
     p.map(call_score, args)
 
 def pipeline_sc2_single():
-#    run_pipeline_sc2('RFE', 'svm', 'rfe_svm', {'step': 100}, {'kernel': 'linear'}, True)
-    run_pipeline_sc2('RFE', 'lr', 'rfe_lr', {'step': 50}, {}, z_min=0.4, submit=True)
-    run_pipeline_sc2('RFE', 'par', 'rfe_par', {'step': 50}, {}, z_min=0.4, submit=True)
+#    run_pipeline_sc2('RFE', 'lr', 'rfe_lr', {'step': 50}, {}, z_min=0.4, submit=True)
+    run_pipeline_sc2('KBest', 'rdgcv', 'sc2_z0rdgcv', {}, {}, z_min=0, submit=True)
 
 def pipeline_sc2_parallel():
-    methods = ['svm', 'lr', 'rdg', 'par']
-    z_min = [0.2, 0.1]
-    steps = [100, 50, 10]
-    args = [('RFE', method, 'rfe_{0}_z{1}_st{2}'.format(method, z, step), {'step': step}, {}, z, True)
-            for z in z_min for step in steps for method in methods]
+    methods = ['lr', 'rdg', 'par']
+    args = [('KBest', method, 'kb'+method, {}, {}, 0, True)
+            for method in methods]
     p = Pool()
     p.map(run_sc2, args)
+
+
+def pipeline_sc3_single():
+    run_pipeline_sc3('RFE', 'mlss', 'sc3_rfe_mlss', {'step': 100}, {'alpha': 0.1}, z_min=0.3, submit=True)
 
 
 if __name__ == '__main__':
@@ -63,5 +64,6 @@ if __name__ == '__main__':
     #pipeline_parallel()
     #train_set_score()
     #train_set_score_parallel()
-    #pipeline_sc2_single()
-    pipeline_sc2_parallel()
+    pipeline_sc2_single()
+    #pipeline_sc2_parallel()
+    #pipeline_sc3_single()

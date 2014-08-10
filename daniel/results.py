@@ -2,6 +2,9 @@ __author__ = 'daniel'
 
 from matplotlib.pyplot import plot, legend, show
 
+
+#Sub challenge 1
+
 linreg_zmin = [0.08, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]
 linreg_res = [0.17815, 0.18179, 0.17934, 0.17471, 0.16295, 0.12616, 0.04444]
 
@@ -13,7 +16,6 @@ par_res = [0.17992, 0.18398, 0.1766, 0.16847, 0.13991, 0.049336]
 
 svm_zmin = [0.08, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5]
 svm_res = [0.17705, 0.18047, 0.18108, 0.17869, 0.17507, 0.16436, 0.16531]
-
 
 #other
 bayrdg_zmin = [0.08, 0.1, 0.2]
@@ -32,3 +34,6 @@ plot(linreg_zmin, linreg_res, 'o-',
 legend(['linreg', 'ridge', 'par', 'svm'], 'lower left')
 
 show()
+
+
+#Sub challenge 2
