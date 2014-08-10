@@ -7,14 +7,8 @@ from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, LassoCV, ElasticNetCV, \
-    BayesianRidge, PassiveAggressiveRegressor, ARDRegression, LogisticRegression, MultiTaskLasso, RidgeCV
-from sklearn.gaussian_process import GaussianProcess
-from sklearn.cross_decomposition import PLSRegression
-from sklearn.naive_bayes import GaussianNB
-from sklearn.tree import DecisionTreeRegressor
-from sklearn.ensemble import GradientBoostingRegressor
-from sklearn.isotonic import IsotonicRegression
-from sklearn.feature_selection import RFE, SelectKBest, f_regression
+    BayesianRidge, PassiveAggressiveRegressor, MultiTaskLasso, RidgeCV
+from sklearn.feature_selection import RFE, SelectKBest, f_regression, VarianceThreshold
 from time import time
 
 from datasets import load_datasets, load_cell_lines, save_gct_data, submit_to_challenge, load_gene_list, zip_files
@@ -33,14 +27,6 @@ ESTIMATORS = {'knn': KNeighborsRegressor,  # low scores
               'elncv': ElasticNetCV,  # std = 0
               'bayr': BayesianRidge,
               'par': PassiveAggressiveRegressor,
-              'ard': ARDRegression,  # too slow
-              'logr': LogisticRegression,  # too slow
-              'gss': GaussianProcess,  # std = 0
-              'gssnb': GaussianNB,  # std = 0
-              'pls': PLSRegression, #fails
-              'tree': DecisionTreeRegressor, # low scores
-              'gbr': GradientBoostingRegressor,  #too slow
-              'iso': IsotonicRegression  # fails
               }
 
 
@@ -68,24 +54,6 @@ def average_by_cell_line():
     save_gct_data(ess_avg_data, 'avg_per_line.gct')
 
 
-def pre_process_data(X, Z, method='id', method_args={}):
-    X2, Z2 = [], []
-
-    if method == 'id':
-        X2, Z2 = X, Z
-
-    if method == 'z-score':
-        z_score = X.std(0) / X.mean(0)
-        X2 = X[:, z_score > method_args['z_min']]
-        Z2 = Z[:, z_score > method_args['z_min']]
-
-
-    scaler = StandardScaler().fit(X2)
-    X2 = scaler.transform(X2)
-    Z2 = scaler.transform(Z2)
-
-    return X2, Z2
-
 def pre_process_datasets(train_data, board_data, method='id', method_args={}):
 
     if method == 'id':
@@ -96,6 +64,11 @@ def pre_process_datasets(train_data, board_data, method='id', method_args={}):
         train_data = train_data.loc[z_score > method_args['z_min'], :]
         board_data = board_data.loc[z_score > method_args['z_min'], :]
 
+    if method == 'var':
+        selector = VarianceThreshold(method_args['t'])
+        selector.fit(train_data.values.T)
+        train_data = train_data.loc[selector.get_support(), :]
+        board_data = board_data.loc[selector.get_support(), :]
 
     scaler = StandardScaler().fit(train_data.values.T)
     train_data.values[:,:] = scaler.transform(train_data.values.T).T
@@ -125,18 +98,18 @@ def training_score(Y, Y2):
 def run_pipeline_sc1(preprocess, method, outputfile, pre_process_args={}, method_args={}, submit=False):
     exp_train_data, ess_train_data, exp_board_data = load_datasets()
 
+    print 'pre-processing data using method', preprocess, str(pre_process_args)
+    exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, preprocess, pre_process_args)
+
     #ess_train_data = ess_train_data.head(100)
 
     X = exp_train_data.values.T
     Y = ess_train_data.values
     Z = exp_board_data.values.T
 
-    print 'pre-processing data using method', preprocess, str(pre_process_args)
-    X2, Z2 = pre_process_data(X, Z, preprocess, pre_process_args)
-
     t0 = time()
     print 'training and predicting using method', method, str(method_args)
-    W = train_and_predict(X2, Y, Z2, method, method_args)
+    W = train_and_predict(X, Y, Z, method, method_args)
     t1 = time() - t0
     print 'tested', method, str(method_args), 'scored:', 'elapsed', t1, 'secs'
 
@@ -206,10 +179,12 @@ def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_
     if selection_method == 'KBest':
         selector = SelectKBest(f_regression, k=10)
         for i, y in enumerate(Y):
-            selector.fit(X, y)
-            features.append(feature_list[selector.get_support(indices=True)])
-            X = X[:,selector.get_support(indices=True)]
-            Z = Z[:,selector.get_support(indices=True)]
+            # selector.fit(X, y)
+            # X = X[:,selector.get_support(indices=True)]
+            # Z = Z[:,selector.get_support(indices=True)]
+            X = selector.fit_transform(X, y)
+            Z = selector.transform(Z)
+            features.append(feature_list[selector.get_support()])
             estimator.fit(X, y)
             w = estimator.predict(Z)
             W.append(w)

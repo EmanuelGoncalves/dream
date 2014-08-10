@@ -22,6 +22,7 @@ PRIORITY_GENE_LIST = SC1_DATA + 'prioritized_gene_list.txt'
 
 def load_gct_data(filename):
     data = read_csv(filename, sep='\t', header=2, index_col=0)
+    del data['Description']
     return data
 
 
@@ -48,10 +49,6 @@ def load_datasets():
     exp_train_data = load_gct_data(EXP_TRAINING_DATA)
     ess_train_data = load_gct_data(ESS_TRAINING_DATA)
     exp_board_data = load_gct_data(EXP_LEADERBOARD_DATA)
-
-    del exp_train_data['Description']
-    del ess_train_data['Description']
-    del exp_board_data['Description']
 
     return exp_train_data, ess_train_data, exp_board_data
 
