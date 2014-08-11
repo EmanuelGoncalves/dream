@@ -44,7 +44,7 @@ def train_set_score_parallel():
 
 def pipeline_sc2_single():
 #    run_pipeline_sc2('RFE', 'lr', 'rfe_lr', {'step': 50}, {}, z_min=0.4, submit=True)
-    run_pipeline_sc2('KBest', 'rdgcv', 'sc2_z0rdgcv_2', {}, {}, z_min=0, submit=True)
+    run_pipeline_sc2('KBest', 'rdgcv', 'sc2_t0rdgcv', {}, {}, t=0, submit=True)
 
 def pipeline_sc2_parallel():
     methods = ['lr', 'rdg', 'par']
@@ -60,10 +60,10 @@ def pipeline_sc3_single():
 
 if __name__ == '__main__':
     #average_by_cell_line()
-    pipeline_sc1_single()
+    #pipeline_sc1_single()
     #pipeline_sc1_parallel()
     #train_set_score()
     #train_set_score_parallel()
-    #pipeline_sc2_single()
+    pipeline_sc2_single()
     #pipeline_sc2_parallel()
     #pipeline_sc3_single()

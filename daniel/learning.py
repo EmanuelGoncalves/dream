@@ -125,34 +125,6 @@ def run_pipeline_sc1(preprocess, method, outputfile, pre_process_args={}, method
         submit_to_challenge(outputfile, 'sc1', label)
 
 
-def score_from_training_set(preprocess, method, pre_process_args={}, method_args={}):
-    exp_train_data, ess_train_data, _ = load_datasets()
-
-    exp_score_data = exp_train_data.iloc[:,2::3]
-    exp_train_data = exp_train_data.iloc[:,::3].join(exp_train_data.iloc[:,1::3])
-
-    ess_train_data = ess_train_data.head(100)
-
-    ess_score_data = ess_train_data.iloc[:,2::3]
-    ess_train_data = ess_train_data.iloc[:,::3].join(ess_train_data.iloc[:,1::3])
-
-
-    X = exp_train_data.values.T
-    Y = ess_train_data.values
-    Z = exp_score_data.values.T
-    W = ess_score_data.values
-
-    print 'pre-processing data using', preprocess, str(pre_process_args)
-    X, Z = pre_process_data(X, Z, preprocess, pre_process_args)
-
-    t0 = time()
-    print 'training and predicting using', method, str(method_args)
-    W2 = train_and_predict(X, Y, Z, method, method_args)
-    t1 = time() - t0
-
-    score = training_score(W, W2)
-
-    print 'tested', method, str(method_args), 'scored:', score, 'elapsed', t1, 'secs'
 
 
 def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args):
@@ -177,16 +149,13 @@ def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_
         print
 
     if selection_method == 'KBest':
-        selector = SelectKBest(f_regression, k=10)
         for i, y in enumerate(Y):
-            # selector.fit(X, y)
-            # X = X[:,selector.get_support(indices=True)]
-            # Z = Z[:,selector.get_support(indices=True)]
-            X = selector.fit_transform(X, y)
-            Z = selector.transform(Z)
+            selector = SelectKBest(f_regression, k=10)
+            X2 = selector.fit_transform(X, y)
+            Z2 = selector.transform(Z)
             features.append(feature_list[selector.get_support()])
-            estimator.fit(X, y)
-            w = estimator.predict(Z)
+            estimator.fit(X2, y)
+            w = estimator.predict(Z2)
             W.append(w)
             if (i+1) % (len(Y) / 10) == 0:
                 print '.',
@@ -196,11 +165,11 @@ def select_features_per_gene(X, Y, Z, feature_list, selection_method, estimator_
     return W, features
 
 
-def run_pipeline_sc2(selection_method, estimator_method, outputfile, selection_args={}, estimator_args={}, z_min=0, submit=False):
+def run_pipeline_sc2(selection_method, estimator_method, outputfile, selection_args={}, estimator_args={}, t=0, submit=False):
     exp_train_data, ess_train_data, exp_board_data = load_datasets()
     gene_list = load_gene_list(PRIORITY_GENE_LIST)
 
-    exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, 'z-score', {'z_min': z_min})
+    exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, 'var', {'t': t})
 
     X = exp_train_data.values.T
     Y = ess_train_data.loc[gene_list, :].values
@@ -289,3 +258,34 @@ def run_pipeline_sc3(selection_method, estimator_method, outputfile, selection_a
         label = 'daniel_' + outputfile
         submit_to_challenge(outputfile + '.zip', 'sc3', label)
 
+
+def score_from_training_set(preprocess, method, pre_process_args={}, method_args={}):
+    exp_train_data, ess_train_data, _ = load_datasets()
+
+
+    exp_score_data = exp_train_data.iloc[:,2::3]
+    exp_train_data = exp_train_data.iloc[:,::3].join(exp_train_data.iloc[:,1::3])
+
+    print 'pre-processing data using method', preprocess, str(pre_process_args)
+    exp_train_data, exp_score_data = pre_process_datasets(exp_train_data, exp_score_data, preprocess, pre_process_args)
+
+
+#    ess_train_data = ess_train_data.head(100)
+
+    ess_score_data = ess_train_data.iloc[:,2::3]
+    ess_train_data = ess_train_data.iloc[:,::3].join(ess_train_data.iloc[:,1::3])
+
+
+    X = exp_train_data.values.T
+    Y = ess_train_data.values
+    Z = exp_score_data.values.T
+    W = ess_score_data.values
+
+    t0 = time()
+    print 'training and predicting using', method, str(method_args)
+    W2 = train_and_predict(X, Y, Z, method, method_args)
+    t1 = time() - t0
+
+    score = training_score(W, W2)
+
+    print 'tested', method, str(method_args), 'scored:', score, 'elapsed', t1, 'secs'
