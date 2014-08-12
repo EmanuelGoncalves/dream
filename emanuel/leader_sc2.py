@@ -6,51 +6,35 @@ sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/'
 
 import numpy as np
 import zipfile
-from sklearn.linear_model import ElasticNetCV, RidgeCV
+from scipy.stats import spearmanr
+from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regression
+from sklearn.metrics import make_scorer
 from pandas import DataFrame
-from dream_2014_functions import read_gct, save_gct_data, write_features, submit_solution
+from dream_2014_functions import read_data_sets, save_gct_data, write_features, submit_solution, ev_code_sc2
 
-# Data-sets files
-train_exp_file = 'data/CCLE_expression_training.gct'
-train_cnv_file = 'data/CCLE_copynumber_training.gct'
-train_ess_file = 'data/Achilles_v2.9_training.gct'
 
-leader_exp_file = 'data/CCLE_expression_leaderboard.gct'
-leader_cnv_file = 'data/CCLE_copynumber_leaderboard.gct'
-
-gene_list = 'data/prioritized_gene_list.txt'
+def spearm_cor_func(expected, pred):
+    return spearmanr(expected, pred)[0]
 
 # Folders
-submissions_folder = 'submissions/'
-submission_filename_prefix = 'sc2_emanuel_'
+submission_filename_prefix = 'sc2_emanuel_phase2_'
 
-# Evaluation codes
-ev_code_sc1 = 2468319
-ev_code_sc2 = 2468322
-ev_code_sc3 = 2482339
-
-# Import data
-train_exp = read_gct(train_exp_file)
-train_cnv = read_gct(train_cnv_file)
-train_ess = read_gct(train_ess_file)
-
-leader_exp = read_gct(leader_exp_file)
-leader_cnv = read_gct(leader_cnv_file)
+# Import data-sets
+train_exp, train_cnv, train_ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
 # Predicted genes
-genes = np.genfromtxt(gene_list, dtype='str')
 samples = leader_exp.axes[0]
 
 # Configurations
-predictions = DataFrame(None, index=genes, columns=samples)
+predictions = DataFrame(None, index=prioritized_genes, columns=samples)
 predictions_features = {}
 
 var_fs_thres = 0.25
 
-X_train_pre = train_exp.join(train_cnv)
-X_test_pre = leader_exp.join(leader_cnv)
+X_train_pre = train_exp
+X_test_pre = leader_exp
 features = X_train_pre.axes[1]
 
 var_fs = VarianceThreshold(var_fs_thres)
@@ -58,7 +42,7 @@ X_train_pre = var_fs.fit_transform(X_train_pre)
 X_test_pre = var_fs.transform(X_test_pre)
 features = features[var_fs.get_support()]
 
-for gene in genes:
+for gene in prioritized_genes:
     # Assemble prediction variables
     X_train = X_train_pre
     y_train = train_ess.ix[:, gene]
@@ -76,8 +60,8 @@ for gene in genes:
     gene_features = features[fs.get_support()]
 
     # Estimation
-    clf = ElasticNetCV(l1_ratio=[.1, .12, .15, .17, .2, .25, .3, .5, .7, .9, 1])
-    #clf = RidgeCV(gcv_mode='auto')
+    my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
+    clf = RidgeCV(scoring=my_spearm_cor_func, gcv_mode='auto')
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
     print gene, X_train.shape, clf.alpha_

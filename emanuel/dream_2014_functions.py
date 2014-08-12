@@ -3,21 +3,48 @@ __author__ = 'emanuel'
 import os
 import numpy as np
 from synapseclient import *
-from pandas import read_csv, DataFrame
+from pandas import read_csv
 
 # Folders
-submissions_folder = 'submissions/'
+submissions_folder = '_submissions_phase2/'
+
+# Data-sets files
+train_exp_file = '_data_phase2/CCLE_expression_training_phase2.gct'
+train_cnv_file = '_data_phase2/CCLE_copynumber_training_phase2.gct'
+train_ess_file = '_data_phase2/Achilles_v2.11_training_phase2.gct'
+
+leader_exp_file = '_data_phase2/CCLE_expression_leaderboard_phase2.gct'
+leader_cnv_file = '_data_phase2/CCLE_copynumber_leaderboard_phase2.gct'
+
+prioritized_gene_list = '_data_phase2/prioritized_gene_list_phase2.txt'
+
+# Evaluation codes
+ev_code_sc1 = 2571160
+ev_code_sc2 = 2571162
+ev_code_sc3 = 2571164
 
 
-# Utilities function
 def read_gct(filename):
     data = read_csv(filename, sep='\t', header=2, index_col=0)
     del data['Description']
     return data.T
 
 
+def read_data_sets():
+    train_exp = read_gct(train_exp_file)
+    train_cnv = read_gct(train_cnv_file)
+    train_ess = read_gct(train_ess_file)
+
+    leader_exp = read_gct(leader_exp_file)
+    leader_cnv = read_gct(leader_cnv_file)
+
+    prioritized_genes = np.genfromtxt(prioritized_gene_list, dtype='str')
+
+    return train_exp, train_cnv, train_ess, leader_exp, leader_cnv, prioritized_genes
+
+
 def save_gct_data(dataframe, submission_filename_prefix, folder=submissions_folder, sep='\t'):
-    n_submissions = len([x for x in os.listdir('submissions/') if x.startswith(submission_filename_prefix) and x.endswith('.gct')]) + 1
+    n_submissions = len([x for x in os.listdir(submissions_folder) if x.startswith(submission_filename_prefix) and x.endswith('.gct')]) + 1
     filename = folder + submission_filename_prefix + str(n_submissions) + '.gct'
 
     rows = dataframe.shape[0]

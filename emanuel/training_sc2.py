@@ -6,54 +6,47 @@ sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/'
 
 import numpy as np
 from scipy.stats import spearmanr
-from sklearn.linear_model import RidgeCV, ElasticNetCV, LassoCV
+from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regression
+from sklearn.metrics import make_scorer
 from pandas import DataFrame
-from dream_2014_functions import read_gct
+from dream_2014_functions import read_data_sets
 
 
-def register_trainning(method, features='NA', normalization='NA', feature_selection='NA', feature_selection_thres='NA', score='NA', others='NA', sep='\t'):
-    with open('emanuel/training.log', 'a') as f:
-        f.write(method + sep + features + sep + normalization + sep + feature_selection + sep + feature_selection_thres + sep + score + sep + others + '\n')
+def spearm_cor_func(expected, pred):
+    return spearmanr(expected, pred)[0]
 
-# Data-sets files
-train_exp_file = 'data/CCLE_expression_training.gct'
-train_cnv_file = 'data/CCLE_copynumber_training.gct'
-train_ess_file = 'data/Achilles_v2.9_training.gct'
-gene_list = 'data/prioritized_gene_list.txt'
-
-# Import data
-exp = read_gct(train_exp_file)
-cnv = read_gct(train_cnv_file)
-ess = read_gct(train_ess_file)
+# Import data-sets
+exp, cnv, ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
 # Split training data-set in two
-train_exp = exp.iloc[range(0, 25), ]
-train_cnv = cnv.iloc[range(0, 25), ]
-train_ess = ess.iloc[range(0, 25), ]
+train_exp = exp.iloc[range(0, 50), ]
+train_cnv = cnv.iloc[range(0, 50), ]
+train_ess = ess.iloc[range(0, 50), ]
 
-pred_exp = exp.iloc[range(26, 45), ]
-pred_cnv = cnv.iloc[range(26, 45), ]
-pred_ess = ess.iloc[range(26, 45), ].T
-
-# Predicted genes
-genes = np.genfromtxt(gene_list, dtype='str')
-samples = pred_ess.axes[1]
-
-# Configurations
-predictions = DataFrame(None, index=genes, columns=samples)
-var_fs_thres = 0.25
-cv_n = 5
+pred_exp = exp.iloc[range(51, 66), ]
+pred_cnv = cnv.iloc[range(51, 66), ]
+pred_ess = ess.iloc[range(51, 66), ].T
 
 X_train_pre = train_exp
 X_test_pre = pred_exp
 
+samples = pred_ess.axes[1]
+features = X_train_pre.axes[1]
+
+# Configurations
+predictions = DataFrame(None, index=prioritized_genes, columns=samples)
+var_fs_thres = 0.25
+par_epsilon = 0.01
+my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
+
 var_fs = VarianceThreshold(var_fs_thres)
 X_train_pre = var_fs.fit_transform(X_train_pre)
 X_test_pre = var_fs.transform(X_test_pre)
+features = features[var_fs.get_support()]
 
-for gene in genes:
+for gene in prioritized_genes:
     # Assemble prediction variables
     X_train = X_train_pre
     y_train = train_ess.ix[:, gene]
@@ -68,21 +61,20 @@ for gene in genes:
     fs = SelectKBest(f_regression)
     X_train = fs.fit_transform(X_train, y_train)
     X_test = fs.transform(X_test)
+    gene_features = features[fs.get_support()]
 
     # Estimation
-    #clf = RidgeCV(gcv_mode='auto')
-    #clf = LassoCV()
-    clf = ElasticNetCV(l1_ratio=[.1, .12, .15, .17, .2, .25, .3, .5, .7, .9, 1])
+    clf = RidgeCV(scoring=my_spearm_cor_func, gcv_mode='auto')
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
-    print gene, X_train.shape, clf.alpha_
+    print gene, X_train.shape
 
     # Store results
     predictions.ix[gene] = y_test_pred
 
 # Calculate score
 correlations = []
-for gene in genes:
+for gene in prioritized_genes:
     correlations.append(spearmanr(predictions.loc[gene], pred_ess.loc[gene])[0])
 
 # Register run result

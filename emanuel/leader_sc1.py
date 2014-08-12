@@ -7,37 +7,19 @@ sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/'
 from pandas import DataFrame
 from sklearn.linear_model import PassiveAggressiveRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import VarianceThreshold
-from dream_2014_functions import read_gct, save_gct_data, submit_solution
-
-# Data-sets files
-train_exp_file = 'data/CCLE_expression_training.gct'
-train_cnv_file = 'data/CCLE_copynumber_training.gct'
-train_ess_file = 'data/Achilles_v2.9_training.gct'
-
-leader_exp_file = 'data/CCLE_expression_leaderboard.gct'
-leader_cnv_file = 'data/CCLE_copynumber_leaderboard.gct'
+from sklearn.feature_selection import SelectKBest, f_regression
+from dream_2014_functions import read_data_sets, save_gct_data, submit_solution, ev_code_sc1
 
 # Folders
-submissions_folder = 'submissions/'
-submission_filename_prefix = 'sc1_emanuel_'
+submission_filename_prefix = 'sc1_emanuel_phase2_'
 
-# Evaluation codes
-ev_code_sc1 = 2468319
-ev_code_sc2 = 2468322
-ev_code_sc3 = 2482339
-
-# Import data
-train_exp = read_gct(train_exp_file)
-train_cnv = read_gct(train_cnv_file)
-train_ess = read_gct(train_ess_file)
-
-leader_exp = read_gct(leader_exp_file)
-leader_cnv = read_gct(leader_cnv_file)
+# Import data-sets
+train_exp, train_cnv, train_ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
 genes = train_ess.axes[1]
+samples = leader_exp.axes[0]
 
-predictions = DataFrame(None, index=genes, columns=leader_exp.axes[0])
+predictions = DataFrame(None, index=genes, columns=samples)
 
 # Assemble trainning and prediction features datasets
 train_features = train_exp
@@ -46,10 +28,6 @@ leader_features = leader_exp
 # Assemble predictions
 X_train_pre = train_features
 X_test_pre = leader_features
-
-var_fs = VarianceThreshold(0.25)
-X_train_pre = var_fs.fit_transform(X_train_pre)
-X_test_pre = var_fs.transform(X_test_pre)
 
 # Perform elastic net
 for gene in genes:
@@ -61,6 +39,11 @@ for gene in genes:
     # Standardize features
     X_train = StandardScaler().fit_transform(X_train)
     X_test = StandardScaler().fit_transform(X_test)
+
+    # Feature selection
+    fs = SelectKBest(f_regression, k=5000)
+    X_train = fs.fit_transform(X_train, y_train)
+    X_test = fs.transform(X_test)
 
     print gene, X_train.shape
 
