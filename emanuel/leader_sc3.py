@@ -1,9 +1,5 @@
 __author__ = 'emanuel'
 
-# Set-up workspace
-import sys
-sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/')
-
 import numpy as np
 import zipfile
 import operator

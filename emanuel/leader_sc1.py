@@ -1,14 +1,16 @@
 __author__ = 'emanuel'
 
-# Set-up workspace
-import sys
-sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/')
-
 from pandas import DataFrame
-from sklearn.linear_model import PassiveAggressiveRegressor
+from scipy.stats import spearmanr
+from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.feature_selection import RFECV
+from sklearn.metrics import make_scorer
 from dream_2014_functions import read_data_sets, save_gct_data, submit_solution, ev_code_sc1
+
+
+def spearm_cor_func(expected, pred):
+    return spearmanr(expected, pred)[0]
 
 # Folders
 submission_filename_prefix = 'sc1_emanuel_phase2_'
@@ -20,6 +22,8 @@ genes = train_ess.axes[1]
 samples = leader_exp.axes[0]
 
 predictions = DataFrame(None, index=genes, columns=samples)
+
+my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
 
 # Assemble trainning and prediction features datasets
 train_features = train_exp
@@ -41,16 +45,17 @@ for gene in genes:
     X_test = StandardScaler().fit_transform(X_test)
 
     # Feature selection
-    fs = SelectKBest(f_regression, k=5000)
+    clf = RidgeCV()
+
+    fs = RFECV(clf, step=150, scoring=my_spearm_cor_func)
     X_train = fs.fit_transform(X_train, y_train)
     X_test = fs.transform(X_test)
 
     print gene, X_train.shape
 
     # Training
-    par = PassiveAggressiveRegressor(epsilon=0.01)
-    par.fit(X_train, y_train)
-    y_test_pred = par.predict(X_test)
+    clf.fit(X_train, y_train)
+    y_test_pred = clf.predict(X_test)
 
     # Store results
     predictions.ix[gene] = y_test_pred

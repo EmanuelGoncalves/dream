@@ -1,16 +1,18 @@
 __author__ = 'emanuel'
 
 # Set-up workspace
-import sys
-sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/')
-
 import numpy as np
 from scipy.stats import spearmanr
 from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.feature_selection import RFECV
+from sklearn.metrics import make_scorer
 from pandas import DataFrame
 from dream_2014_functions import read_data_sets
+
+
+def spearm_cor_func(expected, pred):
+    return spearmanr(expected, pred)[0]
 
 # Import data-sets
 exp, cnv, ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
@@ -33,6 +35,8 @@ predictions = DataFrame(None, index=genes, columns=samples)
 var_fs_thres = 0.18
 par_epsilon = 0.01
 
+my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
+
 X_train_pre = train_exp
 X_test_pre = pred_exp
 
@@ -48,15 +52,15 @@ for gene in genes:
     X_test = scaler.transform(X_test)
 
     # Feature selection
-    fs = SelectKBest(f_regression, k=2000)
+    clf = RidgeCV()
+
+    fs = RFECV(clf, step=150, scoring=my_spearm_cor_func)
     X_train = fs.fit_transform(X_train, y_train)
     X_test = fs.transform(X_test)
 
     print gene, X_train.shape
 
     # Estimation
-    #clf = PassiveAggressiveRegressor(epsilon=par_epsilon)
-    clf = RidgeCV()
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
     # Store results
@@ -69,5 +73,9 @@ for gene in genes:
 
 # Register run result
 score = '%.5f' % np.mean(correlations)
+config_output = 'RFECV\t300\tspearman\tRidgeCV\t\t' + score
+print config_output
 
-print 'Kbest\t2000\tRidgeCV\t\t', score
+with open('emanuel/training_sc1.log', 'a') as f:
+    f.write(config_output + '\n')
+
