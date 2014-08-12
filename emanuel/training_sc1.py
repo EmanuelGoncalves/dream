@@ -6,9 +6,9 @@ sys.path.append('/Users/emanuel/Documents/projects_data_analysis/dream/emanuel/'
 
 import numpy as np
 from scipy.stats import spearmanr
-from sklearn.linear_model import PassiveAggressiveRegressor, RidgeCV
+from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regression
+from sklearn.feature_selection import SelectKBest, f_regression
 from pandas import DataFrame
 from dream_2014_functions import read_data_sets
 
@@ -36,10 +36,6 @@ par_epsilon = 0.01
 X_train_pre = train_exp
 X_test_pre = pred_exp
 
-#var_fs = VarianceThreshold(var_fs_thres)
-#X_train_pre = var_fs.fit_transform(X_train_pre)
-#X_test_pre = var_fs.transform(X_test_pre)
-
 for gene in genes:
     # Assemble prediction variables
     X_train = X_train_pre
@@ -52,14 +48,15 @@ for gene in genes:
     X_test = scaler.transform(X_test)
 
     # Feature selection
-    fs = SelectKBest(f_regression, k=5500)
+    fs = SelectKBest(f_regression, k=2000)
     X_train = fs.fit_transform(X_train, y_train)
     X_test = fs.transform(X_test)
 
     print gene, X_train.shape
 
     # Estimation
-    clf = PassiveAggressiveRegressor(epsilon=par_epsilon)
+    #clf = PassiveAggressiveRegressor(epsilon=par_epsilon)
+    clf = RidgeCV()
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
     # Store results
@@ -73,4 +70,4 @@ for gene in genes:
 # Register run result
 score = '%.5f' % np.mean(correlations)
 
-print 'Kbest\t5500\tPAR\t0.01\t\t', score
+print 'Kbest\t2000\tRidgeCV\t\t', score
