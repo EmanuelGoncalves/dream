@@ -55,7 +55,8 @@ def pipeline_sc2_parallel():
 
 
 def pipeline_sc3_single():
-    run_pipeline_sc3('RFE', 'mlss', 'sc3_rfe_mlss', {'step': 100}, {'alpha': 0.1}, z_min=0.3, submit=True)
+#    run_pipeline_sc3('RFE', 'mlss', 'sc3_rfe_mlss', {'step': 100}, {'alpha': 0.1}, z_min=0.3, submit=True)
+    run_pipeline_sc3('KBest', 'rdgcv', 'sc3_kb_rdgcv', {}, {}, z_min=0, submit=False)
 
 
 if __name__ == '__main__':
@@ -64,6 +65,6 @@ if __name__ == '__main__':
     #pipeline_sc1_parallel()
     #train_set_score()
     #train_set_score_parallel()
-    pipeline_sc2_single()
+    #pipeline_sc2_single()
     #pipeline_sc2_parallel()
-    #pipeline_sc3_single()
+    pipeline_sc3_single()
