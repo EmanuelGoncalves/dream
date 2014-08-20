@@ -213,9 +213,43 @@ def select_features(X, Y, Z, feature_list, selection_method, estimator_method, s
     if selection_method == 'RFE':
         selector = RFE(estimator=estimator, n_features_to_select=100, **selection_args)
 
-    selector = selector.fit(X, Y)
+    selector = selector.fit(X, Y.T)
     features = feature_list[selector.support_]
     W = selector.predict(Z)
+
+    return W.T, features
+
+
+
+def concat_features_for_genes(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args):
+    W = []
+    features = []
+
+    if selection_method == 'KBest':
+        for i, y in enumerate(Y):
+            selector = SelectKBest(f_regression, k=10)
+            selector.fit(X, y)
+            features.extend(selector.get_support(indices=True))
+            if (i+1) % (len(Y) / 10) == 0:
+                print '.',
+        print
+
+    feature_count = [(feat, features.count(feat)) for feat in set(features)]
+    feature_count.sort(key=lambda (a, b): b, reverse=True)
+    top100 = [feat for feat, _ in feature_count[:100]]
+    features = feature_list[top100]
+    X2 = X[:,top100]
+    Z2 = Z[:,top100]
+
+    estimator = ESTIMATORS[estimator_method](**estimator_args)
+
+    for i, y in enumerate(Y):
+        estimator.fit(X2, y)
+        w = estimator.predict(Z2)
+        W.append(w)
+        if (i+1) % (len(Y) / 10) == 0:
+            print '.',
+    print
 
     return W, features
 
@@ -228,7 +262,7 @@ def run_pipeline_sc3(selection_method, estimator_method, outputfile, selection_a
     exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, 'z-score', {'z_min': z_min})
 
     X = exp_train_data.values.T
-    Y = ess_train_data.loc[gene_list, :].values.T
+    Y = ess_train_data.loc[gene_list, :].values
     Z = exp_board_data.values.T
     feature_list = exp_board_data.index.values
 
@@ -237,11 +271,12 @@ def run_pipeline_sc3(selection_method, estimator_method, outputfile, selection_a
     print 'prediction with', estimator_method, str(estimator_args)
 
     t0 = time()
-    W, features = select_features(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args)
+#    W, features = select_features(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args)
+    W, features =  concat_features_for_genes(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args)
     t1 = time() - t0
     print 'elasped', t1
 
-    ess_board_data = DataFrame(W.T,
+    ess_board_data = DataFrame(W,
                                columns=exp_board_data.columns,
                                index=gene_list)
     ess_board_data.index.name = 'Name'
