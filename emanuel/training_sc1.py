@@ -2,13 +2,16 @@ __author__ = 'emanuel'
 
 # Set-up workspace
 import numpy as np
+import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
-from sklearn.linear_model import RidgeCV
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import RFECV
+from sklearn.linear_model import RidgeCV, PassiveAggressiveRegressor
 from sklearn.metrics import make_scorer
-from pandas import DataFrame
-from dream_2014_functions import read_data_sets
+from pandas import DataFrame, Series
+from dream_2014_functions import read_data_sets, read_annotations
+
+
+def hill_function(matrix, hill_coef=6):
+    return 1 / ((np.median(exp, axis=0) / matrix) ** hill_coef + 1)
 
 
 def spearm_cor_func(expected, pred):
@@ -16,6 +19,13 @@ def spearm_cor_func(expected, pred):
 
 # Import data-sets
 exp, cnv, ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
+
+# Import annotations
+gene_annot = read_annotations()
+
+# Preprocess expression data-sets
+exp = exp.drop(gene_annot[gene_annot.isnull().values].axes[0].values, 1)
+exp = hill_function(exp)
 
 # Split training data-set in two
 train_exp = exp.iloc[range(50), ]
@@ -28,17 +38,21 @@ pred_ess = ess.iloc[range(51, 66), ].T
 
 # Predicted genes
 genes = pred_ess.axes[0]
+#genes = prioritized_genes
 samples = pred_ess.axes[1]
 
 # Configurations
 predictions = DataFrame(None, index=genes, columns=samples)
-var_fs_thres = 0.18
-par_epsilon = 0.01
-
 my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
+cv_thres = 0.3
 
 X_train_pre = train_exp
 X_test_pre = pred_exp
+
+# Filter by coeficient variation
+features_to_keep = X_train_pre.std() / X_train_pre.mean() > cv_thres
+X_train_pre = X_train_pre.loc[:, features_to_keep.values]
+X_test_pre = X_test_pre.loc[:, features_to_keep.values]
 
 for gene in genes:
     # Assemble prediction variables
@@ -46,25 +60,14 @@ for gene in genes:
     y_train = train_ess.ix[:, gene]
     X_test = X_test_pre
 
-    # Normalization
-    scaler = StandardScaler().fit(X_train)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
-
-    # Feature selection
-    clf = RidgeCV()
-
-    fs = RFECV(clf, step=150, scoring=my_spearm_cor_func)
-    X_train = fs.fit_transform(X_train, y_train)
-    X_test = fs.transform(X_test)
-
-    print gene, X_train.shape
-
     # Estimation
+    clf = PassiveAggressiveRegressor(epsilon=0.01)
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
     # Store results
     predictions.ix[gene] = y_test_pred
+
+    print gene, X_train.shape
 
 # Calculate score
 correlations = []
@@ -73,7 +76,7 @@ for gene in genes:
 
 # Register run result
 score = '%.5f' % np.mean(correlations)
-config_output = 'RFECV\t300\tspearman\tRidgeCV\t\t' + score
+config_output = 'CV+HillFunction\t'+str(cv_thres)+',6\tPassiveAggressiveRegressor+Clustering\t\t' + score
 print config_output
 
 with open('emanuel/training_sc1.log', 'a') as f:

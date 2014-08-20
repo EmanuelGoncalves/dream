@@ -18,10 +18,22 @@ leader_cnv_file = '_data_phase2/CCLE_copynumber_leaderboard_phase2.gct'
 
 prioritized_gene_list = '_data_phase2/prioritized_gene_list_phase2.txt'
 
+# Annotation files
+exp_annot_file = '_data_phase2/CCLE_expression_gene_annotations_phase2.txt'
+
 # Evaluation codes
 ev_code_sc1 = 2571160
 ev_code_sc2 = 2571162
 ev_code_sc3 = 2571164
+
+
+def read_annot(filename):
+    data = read_csv(filename, sep='\t', index_col=0)
+    return data
+
+
+def read_annotations():
+    return read_annot(exp_annot_file)
 
 
 def read_gct(filename):
@@ -70,6 +82,29 @@ def save_gct_data(dataframe, submission_filename_prefix, folder=submissions_fold
 
     return filename
 
+def write_features(gene_features, submission_filename_prefix, folder=submissions_folder, sep='\t'):
+    n_submissions = len([x for x in os.listdir(submissions_folder) if x.startswith(submission_filename_prefix) and x.endswith('.txt')]) + 1
+    filename = folder + submission_filename_prefix + str(n_submissions) + '.txt'
+
+    with open(filename, 'w') as f:
+        for k, v in gene_features.items():
+            f.write(k)
+            for feature in v:
+                f.write(sep + feature)
+            f.write('\n')
+
+    return filename
+
+
+def write_features_sc3(gene_features, submission_filename_prefix, folder=submissions_folder, sep='\t'):
+    n_submissions = len([x for x in os.listdir(submissions_folder) if x.startswith(submission_filename_prefix) and x.endswith('.txt')]) + 1
+    filename = folder + submission_filename_prefix + str(n_submissions) + '.txt'
+
+    with open(filename, 'w') as f:
+        f.write(sep.join(gene_features))
+        f.write('\n')
+
+    return filename
 
 def submit_solution(filepath, name, evaluation_id, team='UM-EBI', project_id='syn2563019'):
     syn = Synapse()
@@ -102,29 +137,6 @@ def resampling(y_train, X_train, nresampling=20):
         y_train = y_train.append(y_train_outliers)
         X_train = np.append(X_train, X_train_outliers, axis=0)
 
-
-def write_features(gene_features, submission_filename_prefix, folder=submissions_folder, sep='\t'):
-    n_submissions = len([x for x in os.listdir('submissions/') if x.startswith(submission_filename_prefix) and x.endswith('.txt')]) + 1
-    filename = folder + submission_filename_prefix + str(n_submissions) + '.txt'
-
-    with open(filename, 'w') as f:
-        for k, v in gene_features.items():
-            f.write(k)
-            for feature in v:
-                f.write(sep + feature)
-            f.write('\n')
-
-    return filename
-
-def write_features_sc3(gene_features, submission_filename_prefix, folder=submissions_folder, sep='\t'):
-    n_submissions = len([x for x in os.listdir('submissions/') if x.startswith(submission_filename_prefix) and x.endswith('.txt')]) + 1
-    filename = folder + submission_filename_prefix + str(n_submissions) + '.txt'
-
-    with open(filename, 'w') as f:
-        f.write('\t'.join(gene_features))
-        f.write('\n')
-
-    return filename
 
 def read_features(filename):
     features_table = {}

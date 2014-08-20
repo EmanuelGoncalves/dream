@@ -5,7 +5,8 @@ import zipfile
 import operator
 from sklearn.linear_model import RidgeCV
 from sklearn.preprocessing import StandardScaler
-from pandas import DataFrame
+from sklearn.feature_selection import SelectKBest, f_regression
+from pandas import DataFrame, Series
 from dream_2014_functions import read_data_sets, save_gct_data, read_features, submit_solution, write_features_sc3, ev_code_sc3
 
 # Folders
@@ -22,13 +23,12 @@ predictions = DataFrame(None, index=prioritized_genes, columns=samples)
 var_fs_thres = 0.25
 cv_n = 5
 
-# Feature selection
-features_dict = read_features('submissions/sc2_emanuel_3.txt')
-features_soreted = sorted(features_dict.iteritems(), key=operator.itemgetter(1), reverse=True)
-features = [features_soreted[i][0] for i in range(100)]
+X_train_pre = train_exp
+X_test_pre = leader_exp
 
-X_train_pre = train_exp[features]
-X_test_pre = leader_exp[features]
+# Prepare features
+features = X_train_pre.axes[1]
+important_features = []
 
 for gene in prioritized_genes:
     # Assemble prediction variables
@@ -41,11 +41,39 @@ for gene in prioritized_genes:
     X_train = scaler.transform(X_train)
     X_test = scaler.transform(X_test)
 
+    # Feature selection
+    fs = SelectKBest(f_regression, k=5)
+    X_train = fs.fit_transform(X_train, y_train)
+    X_test = fs.transform(X_test)
+    gene_features = features[fs.get_support()]
+
+    # Store gene features
+    important_features.append(gene_features.values)
+
+    print gene, X_test.shape
+
+# Filter features
+important_features = Series([feature for feature_list in important_features for feature in feature_list])
+important_features_top_100 = [x for x in important_features.value_counts().head(100).index]
+
+predictions = DataFrame(None, index=prioritized_genes, columns=samples)
+
+for gene in prioritized_genes:
+    # Assemble prediction variables
+    X_train = X_train_pre.loc[:, important_features_top_100]
+    X_test = X_test_pre.loc[:, important_features_top_100]
+    y_train = train_ess.ix[:, gene]
+
+    # Normalization
+    scaler = StandardScaler().fit(X_train)
+    X_train = scaler.transform(X_train)
+    X_test = scaler.transform(X_test)
+
     # Estimation
-    clf = RidgeCV(gcv_mode='auto')
+    clf = RidgeCV()
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
-    print gene, X_train.shape, clf.alpha_
+    print gene, X_train.shape
 
     # Store results
     predictions.ix[gene] = y_test_pred
@@ -53,7 +81,7 @@ for gene in prioritized_genes:
 filename_gct = save_gct_data(predictions, submission_filename_prefix)
 print '[DONE]: Saved to file ' + filename_gct
 
-filename_txt = write_features_sc3(features, submission_filename_prefix)
+filename_txt = write_features_sc3(important_features_top_100, submission_filename_prefix)
 print '[DONE]: Saved to file ' + filename_txt
 
 filename_zip = filename_gct.split('.')[0] + '.zip'
