@@ -16,15 +16,15 @@ def call_score(args):
 
 
 def pipeline_sc1_single():
-    run_pipeline_sc1('var', 'par', 'v_eln_a05_l01.gct', {'t': 0.25}, {}, False)
+    run_pipeline_sc1('id', 'rdgcv', 'rdg.gct', {}, {}, True)
 
 
 def pipeline_sc1_parallel():
 
-    methods = ['par']
-    T = [0.1, 0.2, 0.3, 0.4, 0.5]
-    args = [('var', method, 'v{0}_{1}.gct'.format(t, method), {'t': t}, {}, True)
-            for t in T for method in methods]
+    methods = ['rdg']
+    Z = [0.1, 0.2, 0.3]
+    args = [('z-score', method, 'v{0}_{1}.gct'.format(z, method), {'z_min': z}, {}, True)
+            for z in Z for method in methods]
     p = Pool()
     p.map(run_sc1, args)
 
@@ -61,10 +61,10 @@ def pipeline_sc3_single():
 
 if __name__ == '__main__':
     #average_by_cell_line()
-    #pipeline_sc1_single()
+    pipeline_sc1_single()
     #pipeline_sc1_parallel()
     #train_set_score()
     #train_set_score_parallel()
     #pipeline_sc2_single()
     #pipeline_sc2_parallel()
-    pipeline_sc3_single()
+    #pipeline_sc3_single()

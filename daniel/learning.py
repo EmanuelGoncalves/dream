@@ -1,7 +1,8 @@
 __author__ = 'daniel'
 
 from pandas import DataFrame
-from numpy import mean
+from numpy import mean, std, exp
+from numpy.random import randn
 from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
@@ -59,6 +60,9 @@ def pre_process_datasets(train_data, board_data, method='id', method_args={}):
     if method == 'id':
         train_data, board_data
 
+#    train_data = train_data.apply(exp)
+#    board_data = board_data.apply(exp)
+
     if method == 'z-score':
         z_score = train_data.std(1).values / train_data.mean(1).values
         train_data = train_data.loc[z_score > method_args['z_min'], :]
@@ -80,13 +84,20 @@ def train_and_predict(X, Y, Z, method, method_args):
     W = []
     estimator = ESTIMATORS[method](**method_args)
 
+    bad = 0
     for i, y in enumerate(Y):
         estimator.fit(X, y)
         w = estimator.predict(Z)
+        if std(w) < 1e-12:
+            w = randn(*w.shape)
+            bad += 1
         W.append(w)
         if (i+1) % (len(Y) / 10) == 0:
             print '.',
     print
+
+    if bad:
+        print '* Warning:', bad, 'bad predictions out of', len(Y)
 
     return W
 
@@ -121,7 +132,7 @@ def run_pipeline_sc1(preprocess, method, outputfile, pre_process_args={}, method
     save_gct_data(ess_board_data, outputfile)
 
     if submit:
-        label = 'daniel_' + outputfile[:-4]
+        label = 'ph2_daniel_' + outputfile[:-4]
         submit_to_challenge(outputfile, 'sc1', label)
 
 
@@ -199,7 +210,7 @@ def run_pipeline_sc2(selection_method, estimator_method, outputfile, selection_a
     zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
     if submit:
-        label = 'daniel_' + outputfile
+        label = 'ph2_daniel_' + outputfile
         submit_to_challenge(outputfile + '.zip', 'sc2', label)
 
 
@@ -290,7 +301,7 @@ def run_pipeline_sc3(selection_method, estimator_method, outputfile, selection_a
     zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
     if submit:
-        label = 'daniel_' + outputfile
+        label = 'ph2_daniel_' + outputfile
         submit_to_challenge(outputfile + '.zip', 'sc3', label)
 
 
