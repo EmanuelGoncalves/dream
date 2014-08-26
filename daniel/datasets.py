@@ -28,11 +28,12 @@ PRIORITY_GENE_LIST_PH1 = PHASE1_DATA + 'prioritized_gene_list.txt'
 CNV_TRAINING_DATA_PH2 = PHASE2_DATA + 'CCLE_copynumber_training_phase2.gct'
 EXP_TRAINING_DATA_PH2 = PHASE2_DATA + 'CCLE_expression_training_phase2.gct'
 ESS_TRAINING_DATA_PH2 = PHASE2_DATA + 'Achilles_v2.11_training_phase2.gct'
-CELL_LINES_TRAINING_PH2 = PHASE2_DATA + 'Cell_line_annotation_training_phase2.txt'
 CNV_LEADERBOARD_DATA_PH2 = PHASE2_DATA + 'CCLE_copynumber_leaderboard_phase2.gct'
 EXP_LEADERBOARD_DATA_PH2 = PHASE2_DATA + 'CCLE_expression_leaderboard_phase2.gct'
-CELL_LINES_LEADERBOARD_PH2 = PHASE2_DATA + 'Cell_line_annotation_leaderboard_phase2.txt'
-PRIORITY_GENE_LIST_PH2 = PHASE2_DATA + 'prioritized_gene_list_phase2.txt'
+
+CELL_LINES_TRAINING = PHASE2_DATA + 'Cell_line_annotation_training_phase2.txt'
+CELL_LINES_LEADERBOARD = PHASE2_DATA + 'Cell_line_annotation_leaderboard_phase2.txt'
+PRIORITY_GENE_LIST = PHASE2_DATA + 'prioritized_gene_list_phase2.txt'
 
 
 def load_gct_data(filename):
@@ -80,6 +81,7 @@ def submit_to_challenge(filename, challenge, label):
     client.login()
     evaluation = client.getEvaluation(CODES[challenge])
 #    client.joinEvaluation(evaluation)
+    filename = filename + '.gct' if challenge == 'sc1' else filename + '.zip'
     myfile = File(RESULTS_FOLDER + filename, parent=PROJECT_ID)
     myfile = client.store(myfile)
     client.submit(evaluation, myfile, name=label, teamName=TEAM)
