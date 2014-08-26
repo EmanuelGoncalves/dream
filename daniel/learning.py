@@ -7,8 +7,8 @@ from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, LassoCV, \
-    ElasticNetCV, PassiveAggressiveRegressor, MultiTaskLasso, RidgeCV
+from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, PassiveAggressiveRegressor, \
+    RidgeCV, LassoCV, ElasticNetCV, MultiTaskLasso, MultiTaskElasticNet
 from sklearn.feature_selection import RFE, SelectKBest, f_regression, VarianceThreshold
 from time import time
 
@@ -19,14 +19,15 @@ from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD, PRIORITY_GENE_
 ESTIMATORS = {'knn': KNeighborsRegressor,
               'svm': SVR,
               'lr': LinearRegression,
-              'rdg': Ridge,
-              'rdgcv': RidgeCV,
-              'lss': Lasso,
-              'lsscv': LassoCV,
-              'mlss': MultiTaskLasso,
-              'eln': ElasticNet,
-              'elncv': ElasticNetCV,
               'par': PassiveAggressiveRegressor,
+              'rdg': Ridge,
+              'lss': Lasso,
+              'eln': ElasticNet,
+              'rdgcv': RidgeCV,
+              'lsscv': LassoCV,
+              'elncv': ElasticNetCV,
+              'mtlss': MultiTaskLasso,
+              'mteln': MultiTaskElasticNet,
               }
 
 
@@ -118,15 +119,6 @@ def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_meth
 
     print
 
-    bad = 0
-    for i, w in enumerate(W):
-        if std(w) < 1e-12:
-            W[i] = randn(*w.shape)
-            bad += 1
-
-    if bad:
-        print '* Warning:', bad, 'bad predictions out of', len(W)
-
     return W, features
 
 
@@ -156,7 +148,6 @@ def sc3_multitask(X, Y, Z, feature_list, selection_method, estimator_method, sel
     return W.T, features
 
 
-
 def sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args):
 
     _, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
@@ -184,6 +175,18 @@ def sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, selec
     return W, top100
 
 
+def clean_bad_predictions(W):
+
+    bad = 0
+    for i, w in enumerate(W):
+        if std(w) < 1e-12:
+            W[i] = randn(*w.shape)
+            bad += 1
+
+    if bad:
+        print '* Warning:', bad, 'bad predictions out of', len(W)
+
+
 def pipeline(sc, preprocess_method, selection_method, estimation_method, outputfile, preprocess_args={}, selection_args={}, estimation_args={}, submit=False):
     exp_train_data, ess_train_data, exp_board_data = load_datasets()
     gene_list = load_gene_list(PRIORITY_GENE_LIST)
@@ -205,38 +208,38 @@ def pipeline(sc, preprocess_method, selection_method, estimation_method, outputf
         W, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
 
     if sc == 'sc2':
-        selection_args['n_features'] == 10
+        selection_args['n_features'] = 10
         W, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
 
     if sc == 'sc3':
-        if estimation_method == 'mlss':
-            selection_args['n_features'] == 100
+        if estimation_method.startswith('mt'):
+            selection_args['n_features'] = 100
             W, features = sc3_multitask(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
         else:
             W, features = sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
 
     t1 = time() - t0
+    clean_bad_predictions(W)
+
     print 'tested', selection_method, estimation_method, 'elapsed', t1, 'secs'
 
     index = ess_train_data.index if sc == 'sc1' else gene_list
     ess_board_data = DataFrame(W, columns=exp_board_data.columns, index=index)
     ess_board_data.insert(0, 'Description', index)
-
-    if sc == 'sc1':
-        save_gct_data(ess_board_data, outputfile + '.gct')
+    save_gct_data(ess_board_data, outputfile + '.gct')
 
     if sc == 'sc2':
         features_data = DataFrame(features, index=gene_list)
         features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False)
-        zip_files(outputfile + '.zip', [outputfile + '.txt', outputfile + '.gct'])
+        zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
     if sc == 'sc3':
         features_data = DataFrame([features])
         features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False, index=False)
-        zip_files(outputfile + '.zip', [outputfile + '.txt', outputfile + '.gct'])
+        zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
     if submit:
-        label = 'ph2_daniel_' + outputfile[:-4]
+        label = 'daniel_' + outputfile[:-4]
         submit_to_challenge(outputfile, sc, label)
 
 
