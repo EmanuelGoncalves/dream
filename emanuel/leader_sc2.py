@@ -3,7 +3,7 @@ __author__ = 'emanuel'
 import numpy as np
 import zipfile
 from scipy.stats import spearmanr
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import RidgeCV, PassiveAggressiveRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regression
 from sklearn.metrics import make_scorer
@@ -21,25 +21,14 @@ submission_filename_prefix = 'sc2_emanuel_phase2_'
 # Import data-sets
 train_exp, train_cnv, train_ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
-# Predicted genes
-samples = leader_exp.axes[0]
-
 # Configurations
-predictions = DataFrame(None, index=prioritized_genes, columns=samples)
+predictions = DataFrame(None, index=prioritized_genes, columns=leader_exp.axes[0])
 predictions_features = {}
-my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
-
-var_fs_thres = 0.25
 
 X_train_pre = train_exp
 X_test_pre = leader_exp
-features = X_train_pre.axes[1]
 
-# Filter by coeficient variation
-features_to_keep = X_train_pre.std() / X_train_pre.mean() > 0.1
-X_train_pre = X_train_pre.loc[:, features_to_keep.values]
-X_test_pre = X_test_pre.loc[:, features_to_keep.values]
-features = features[features_to_keep]
+features = X_train_pre.axes[1]
 
 for gene in prioritized_genes:
     # Assemble prediction variables
@@ -47,19 +36,15 @@ for gene in prioritized_genes:
     y_train = train_ess.ix[:, gene]
     X_test = X_test_pre
 
-    # Normalization
-    scaler = StandardScaler().fit(X_train)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
-
     # Feature selection
-    fs = SelectKBest(f_regression)
-    X_train = fs.fit_transform(X_train, y_train)
+    fs = SelectKBest(f_regression).fit(X_train, y_train)
+    X_train = fs.transform(X_train)
     X_test = fs.transform(X_test)
     gene_features = features[fs.get_support()]
 
     # Estimation
-    clf = RidgeCV(gcv_mode='auto')
+    #clf = RidgeCV(gcv_mode='auto')
+    clf = PassiveAggressiveRegressor(epsilon=0.01)
     y_test_pred = clf.fit(X_train, y_train).predict(X_test)
 
     print gene, X_train.shape

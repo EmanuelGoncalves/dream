@@ -37,25 +37,14 @@ X_test_pre = pred_exp
 features = X_train_pre.axes[1]
 important_features = []
 
-# Filter by coeficient variation
-features_to_keep = X_train_pre.std() / X_train_pre.mean() > 0.1
-X_train_pre = X_train_pre.loc[:, features_to_keep.values]
-X_test_pre = X_test_pre.loc[:, features_to_keep.values]
-features = features[features_to_keep]
-
 for gene in prioritized_genes:
     # Assemble prediction variables
     X_train = X_train_pre
     y_train = train_ess.ix[:, gene]
     X_test = X_test_pre
 
-    # Normalization
-    scaler = StandardScaler().fit(X_train)
-    X_train = scaler.transform(X_train)
-    X_test = scaler.transform(X_test)
-
     # Feature selection
-    fs = SelectKBest(f_regression)
+    fs = SelectKBest(f_regression, k=100)
     X_train = fs.fit_transform(X_train, y_train)
     X_test = fs.transform(X_test)
     gene_features = features[fs.get_support()]
