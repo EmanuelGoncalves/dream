@@ -1,7 +1,7 @@
 __author__ = 'daniel'
 
 from pandas import DataFrame
-from numpy import mean, std
+from numpy import mean, std, exp
 from numpy.random import randn
 from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
@@ -45,6 +45,7 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
         exp_train_data = exp_train_data.loc[exp_cv > threshold[0], :]
         exp_board_data = exp_board_data.loc[exp_cv > threshold[0], :]
         if use_cnv:
+            cnv_train_data = cnv_train_data.apply(exp)
             cnv_cv = cnv_train_data.std(1).values / cnv_train_data.mean(1).values
             cnv_train_data = cnv_train_data.loc[cnv_cv > threshold[1], :]
             cnv_board_data = cnv_board_data.loc[cnv_cv > threshold[1], :]
@@ -184,6 +185,25 @@ def clean_bad_predictions(W):
         print '* Warning:', bad, 'bad predictions out of', len(W)
 
 
+def training_score(X, Y):
+    return mean([spearmanr(x, y)[0] for x, y in zip(X, Y)])
+
+
+def split_datasets(datasets, use_cnv):
+    exp_train_data = datasets['exp_train_data'].iloc[:,::3].join(datasets['exp_train_data'].iloc[:,1::3])
+    datasets['exp_board_data'] = datasets['exp_train_data'].iloc[:,2::3]
+    datasets['exp_train_data'] = exp_train_data
+
+    ess_train_data = datasets['ess_train_data'].iloc[:,::3].join(datasets['ess_train_data'].iloc[:,1::3])
+    datasets['ess_score_data'] = datasets['ess_train_data'].iloc[:,2::3]
+    datasets['ess_train_data'] = ess_train_data
+
+    if use_cnv:
+        cnv_train_data = datasets['cnv_train_data'].iloc[:,::3].join(datasets['cnv_train_data'].iloc[:,1::3])
+        datasets['cnv_board_data'] = datasets['cnv_train_data'].iloc[:,2::3]
+        datasets['cnv_train_data'] = cnv_train_data
+
+
 def pipeline(args):
     sc = args['sc']
     filter_method = args['filter']
@@ -197,9 +217,13 @@ def pipeline(args):
     submit = args['submit']
     outputfile = args['outputfile']
     use_cnv = args['use_cnv']
+    split_train_set = args['split_train_set']
 
     datasets = load_datasets(get_cnv=use_cnv)
     gene_list = datasets['gene_list']
+
+    if split_train_set:
+        split_datasets(datasets, use_cnv)
 
     print 'pre-processing with:', filter_method, 'at', filter_threshold, '. normalize:', normalize
 
@@ -236,59 +260,28 @@ def pipeline(args):
 
     print 'tested', feature_selection,  estimator, 'elapsed', t1, 'secs'
 
-    index = ess_train_data.index if sc == 'sc1' else gene_list
-    ess_board_data = DataFrame(W, columns=feat_board_data.columns, index=index)
-    ess_board_data.insert(0, 'Description', index)
-    save_gct_data(ess_board_data, outputfile + '.gct')
+    if split_train_set:
+        W0 = datasets['ess_score_data'].values
+        score = training_score(W0, W)
+        print 'scored:', score
 
-    if sc == 'sc2':
-        features_data = DataFrame(features, index=gene_list)
-        features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False)
-        zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
+    else:
+        index = ess_train_data.index if sc == 'sc1' else gene_list
+        ess_board_data = DataFrame(W, columns=feat_board_data.columns, index=index)
+        ess_board_data.insert(0, 'Description', index)
+        save_gct_data(ess_board_data, outputfile + '.gct')
 
-    if sc == 'sc3':
-        features_data = DataFrame([features])
-        features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False, index=False)
-        zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
+        if sc == 'sc2':
+            features_data = DataFrame(features, index=gene_list)
+            features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False)
+            zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
-    if submit:
-        label = 'daniel_' + outputfile[:-4]
-        submit_to_challenge(outputfile, sc, label)
+        if sc == 'sc3':
+            features_data = DataFrame([features])
+            features_data.to_csv(RESULTS_FOLDER + outputfile + '.txt', sep='\t', header=False, index=False)
+            zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
+        if submit:
+            label = 'daniel_' + outputfile
+            submit_to_challenge(outputfile, sc, label)
 
-def training_score(Y, Y2):
-    return mean([spearmanr(y, y2)[0] for y, y2 in zip(Y, Y2)])
-
-
-
-def score_from_training_set(preprocess, method, pre_process_args={}, method_args={}, limit_to=None):
-    exp_train_data, ess_train_data, _ = load_datasets()
-
-
-    exp_score_data = exp_train_data.iloc[:,2::3]
-    exp_train_data = exp_train_data.iloc[:,::3].join(exp_train_data.iloc[:,1::3])
-
-    print 'pre-processing data using method', preprocess, str(pre_process_args)
-    exp_train_data, exp_score_data = pre_process_datasets(exp_train_data, exp_score_data, preprocess, pre_process_args)
-
-
-    if limit_to:
-        ess_train_data = ess_train_data.head(limit_to)
-
-    ess_score_data = ess_train_data.iloc[:,2::3]
-    ess_train_data = ess_train_data.iloc[:,::3].join(ess_train_data.iloc[:,1::3])
-
-
-    X = exp_train_data.values.T
-    Y = ess_train_data.values
-    Z = exp_score_data.values.T
-    W = ess_score_data.values
-
-    t0 = time()
-    print 'training and predicting using', method, str(method_args)
-    W2 = select_train_predict(X, Y, Z, method, method_args)
-    t1 = time() - t0
-
-    score = training_score(W, W2)
-
-    print 'tested', method, str(method_args), 'scored:', score, 'elapsed', t1, 'secs'
