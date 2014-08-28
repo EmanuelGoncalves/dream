@@ -2,7 +2,7 @@ __author__ = 'daniel'
 
 from zipfile import ZipFile
 from pandas import read_csv
-from synapseclient import Synapse, Project, File
+from synapseclient import Synapse, File
 
 PROJECT_ID = 'syn2549343'
 TEAM = 'UM-EBI'
@@ -11,7 +11,6 @@ TEAM = 'UM-EBI'
 CODES = {'sc1': '2571160', 'sc2': '2571162', 'sc3': '2571164'}
 
 RESULTS_FOLDER = '../submissions/'
-
 
 PHASE1_DATA = '../data/phase2/'
 PHASE2_DATA = '../data/phase2/'
@@ -30,10 +29,9 @@ EXP_TRAINING_DATA_PH2 = PHASE2_DATA + 'CCLE_expression_training_phase2.gct'
 ESS_TRAINING_DATA_PH2 = PHASE2_DATA + 'Achilles_v2.11_training_phase2.gct'
 CNV_LEADERBOARD_DATA_PH2 = PHASE2_DATA + 'CCLE_copynumber_leaderboard_phase2.gct'
 EXP_LEADERBOARD_DATA_PH2 = PHASE2_DATA + 'CCLE_expression_leaderboard_phase2.gct'
-
-CELL_LINES_TRAINING = PHASE2_DATA + 'Cell_line_annotation_training_phase2.txt'
-CELL_LINES_LEADERBOARD = PHASE2_DATA + 'Cell_line_annotation_leaderboard_phase2.txt'
-PRIORITY_GENE_LIST = PHASE2_DATA + 'prioritized_gene_list_phase2.txt'
+CELL_LINES_TRAINING_PH2 = PHASE2_DATA + 'Cell_line_annotation_training_phase2.txt'
+CELL_LINES_LEADERBOARD_PH2 = PHASE2_DATA + 'Cell_line_annotation_leaderboard_phase2.txt'
+PRIORITY_GENE_LIST_PH2 = PHASE2_DATA + 'prioritized_gene_list_phase2.txt'
 
 
 def load_gct_data(filename):
@@ -61,19 +59,36 @@ def load_gene_list(filename):
     return data.values[:,0]
 
 
-def load_datasets(phase='phase2'):
+def load_datasets(phase='phase2', get_cnv=False):
+
+    datasets = {}
 
     if phase == 'phase1':
-        exp_train_data = load_gct_data(EXP_TRAINING_DATA_PH1)
-        ess_train_data = load_gct_data(ESS_TRAINING_DATA_PH1)
-        exp_board_data = load_gct_data(EXP_LEADERBOARD_DATA_PH1)
+        exp_train_data = EXP_TRAINING_DATA_PH1
+        ess_train_data = ESS_TRAINING_DATA_PH1
+        exp_board_data = EXP_LEADERBOARD_DATA_PH1
+        cnv_train_data = CNV_TRAINING_DATA_PH1
+        cnv_board_data = CNV_LEADERBOARD_DATA_PH1
+        gene_list = PRIORITY_GENE_LIST_PH1
 
     if phase == 'phase2':
-        exp_train_data = load_gct_data(EXP_TRAINING_DATA_PH2)
-        ess_train_data = load_gct_data(ESS_TRAINING_DATA_PH2)
-        exp_board_data = load_gct_data(EXP_LEADERBOARD_DATA_PH2)
+        exp_train_data = EXP_TRAINING_DATA_PH2
+        ess_train_data = ESS_TRAINING_DATA_PH2
+        exp_board_data = EXP_LEADERBOARD_DATA_PH2
+        cnv_train_data = CNV_TRAINING_DATA_PH2
+        cnv_board_data = CNV_LEADERBOARD_DATA_PH2
+        gene_list = PRIORITY_GENE_LIST_PH2
 
-    return exp_train_data, ess_train_data, exp_board_data
+    datasets['exp_train_data'] = load_gct_data(exp_train_data)
+    datasets['ess_train_data'] = load_gct_data(ess_train_data)
+    datasets['exp_board_data'] = load_gct_data(exp_board_data)
+    datasets['gene_list'] = load_gene_list(gene_list)
+
+    if get_cnv:
+        datasets['cnv_train_data'] = load_gct_data(cnv_train_data)
+        datasets['cnv_board_data'] = load_gct_data(cnv_board_data)
+
+    return datasets
 
 def submit_to_challenge(filename, challenge, label):
 

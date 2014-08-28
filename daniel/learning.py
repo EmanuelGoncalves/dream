@@ -12,8 +12,8 @@ from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, Pas
 from sklearn.feature_selection import RFE, SelectKBest, f_regression, VarianceThreshold
 from time import time
 
-from datasets import load_datasets, load_cell_lines, save_gct_data, submit_to_challenge, load_gene_list, zip_files
-from datasets import CELL_LINES_TRAINING, CELL_LINES_LEADERBOARD, PRIORITY_GENE_LIST, RESULTS_FOLDER
+from datasets import load_datasets, save_gct_data, submit_to_challenge, load_gene_list, zip_files
+from datasets import RESULTS_FOLDER
 
 
 ESTIMATORS = {'knn': KNeighborsRegressor,
@@ -31,60 +31,57 @@ ESTIMATORS = {'knn': KNeighborsRegressor,
               }
 
 
-def average_by_cell_line():
-    _, ess_train_data, _ = load_datasets()
+def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normalize=True, use_cnv=False):
 
-    lines_board = load_cell_lines(CELL_LINES_LEADERBOARD)
-    lines_train = load_cell_lines(CELL_LINES_TRAINING)
+    exp_train_data = datasets['exp_train_data']
+    exp_board_data = datasets['exp_board_data']
 
-    data = {}
-
-    for line in lines_board.index:
-        site = lines_board.at[line, 'Site_primary']
-        matches = lines_train.index[lines_train['Site_primary'] == site]
-        if matches.size > 0:
-            data[line] = ess_train_data.loc[:, matches].mean(1).tolist()
-        else:
-            data[line] = ess_train_data.mean(1).tolist()
-
-    ess_avg_data = DataFrame(data, index=ess_train_data.index, columns=lines_board.index)
-    ess_avg_data.insert(0, 'Description', ess_train_data.index)
-    save_gct_data(ess_avg_data, 'avg_per_line.gct')
-
-
-def pre_process_datasets(train_data, board_data, filter_method=None, method_args={}):
-
-    if filter_method is None:
-        train_data, board_data
+    if use_cnv:
+        cnv_train_data = datasets['cnv_train_data']
+        cnv_board_data = datasets['cnv_board_data']
 
     if filter_method == 'cv':
-        cv = train_data.std(1).values / train_data.mean(1).values
-        train_data = train_data.loc[cv > method_args['t'], :]
-        board_data = board_data.loc[cv > method_args['t'], :]
+        exp_cv = exp_train_data.std(1).values / exp_train_data.mean(1).values
+        exp_train_data = exp_train_data.loc[exp_cv > threshold[0], :]
+        exp_board_data = exp_board_data.loc[exp_cv > threshold[0], :]
+        if use_cnv:
+            cnv_cv = cnv_train_data.std(1).values / cnv_train_data.mean(1).values
+            cnv_train_data = cnv_train_data.loc[cnv_cv > threshold[1], :]
+            cnv_board_data = cnv_board_data.loc[cnv_cv > threshold[1], :]
 
     if filter_method == 'var':
-        selector = VarianceThreshold(method_args['t'])
-        selector.fit(train_data.values.T)
-        train_data = train_data.loc[selector.get_support(), :]
-        board_data = board_data.loc[selector.get_support(), :]
+        selector = VarianceThreshold(threshold[0])
+        selector.fit(exp_train_data.values.T)
+        exp_train_data = exp_train_data.loc[selector.get_support(), :]
+        exp_board_data = exp_board_data.loc[selector.get_support(), :]
+        if use_cnv:
+            selector = VarianceThreshold(threshold[1])
+            selector.fit(cnv_train_data.values.T)
+            cnv_train_data = cnv_train_data.loc[selector.get_support(), :]
+            cnv_board_data = cnv_board_data.loc[selector.get_support(), :]
 
-    scaler = StandardScaler().fit(train_data.values.T)
-    train_data.values[:,:] = scaler.transform(train_data.values.T).T
-    board_data.values[:,:] = scaler.transform(board_data.values.T).T
+    feat_train_data = exp_train_data.append(cnv_train_data) if use_cnv else exp_train_data
+    feat_board_data = exp_board_data.append(cnv_board_data) if use_cnv else exp_board_data
 
-    return train_data, board_data
+    if normalize:
+        scaler = StandardScaler().fit(feat_train_data.values.T)
+        feat_train_data.values[:,:] = scaler.transform(feat_train_data.values.T).T
+        feat_board_data.values[:,:] = scaler.transform(feat_board_data.values.T).T
+
+    datasets['feat_train_data'] = feat_train_data
+    datasets['feat_board_data'] = feat_board_data
 
 
-def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_method, selection_args, estimator_args):
+
+def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_method, n_features, selection_args, estimator_args):
     W = []
     features = []
+    n_features = min(n_features, len(feature_list))
 
-    if estimator_method == 'svm' and selection_method == 'RFE':
+    if estimator_method == 'svm' and selection_method == 'rfe':
         estimator_args['kernel'] = 'linear'
 
     estimator = ESTIMATORS[estimator_method](**estimator_args)
-
-    n_features = min(len(feature_list), selection_args['n_features'])
 
     if selection_method is None:
         for i, y in enumerate(Y):
@@ -94,8 +91,8 @@ def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_meth
             if (i+1) % (len(Y) / 10) == 0:
                 print '.',
 
-    if selection_method == 'RFE':
-        selector = RFE(estimator=estimator, n_features_to_select=n_features)
+    if selection_method == 'rfe':
+        selector = RFE(estimator=estimator, n_features_to_select=n_features, **selection_args)
 
         for i, y in enumerate(Y):
             selector = selector.fit(X, y)
@@ -105,8 +102,8 @@ def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_meth
             if (i+1) % (len(Y) / 10) == 0:
                 print '.',
 
-    if selection_method == 'KBest':
-        selector = SelectKBest(f_regression, k=n_features)
+    if selection_method == 'kb':
+        selector = SelectKBest(f_regression, k=n_features, **selection_args)
         for i, y in enumerate(Y):
             X2 = selector.fit_transform(X, y)
             Z2 = selector.transform(Z)
@@ -134,23 +131,23 @@ def sc3_multitask(X, Y, Z, feature_list, selection_method, estimator_method, sel
 
     estimator = ESTIMATORS[estimator_method](**estimator_args)
 
-    if selection_method == 'RFE':
+    if selection_method == 'rfe':
         del selection_args['n_features']
         selector = RFE(estimator=estimator, n_features_to_select=n_features, **selection_args)
         selector = selector.fit(X, Y.T)
         features = feature_list[selector.support_]
         W = selector.predict(Z)
 
-    if selection_method == 'KBest':
+    if selection_method == 'kb':
         print 'Cannot use KBest with multi task methods'
 
 
     return W.T, features
 
 
-def sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args):
+def sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, n_features, selection_args, estimation_args):
 
-    _, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
+    _, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, n_features, selection_args, estimation_args)
 
     best_features = [feat for row in features for feat in row]
     feature_count = [(feat, best_features.count(feat)) for feat in set(best_features)]
@@ -187,44 +184,60 @@ def clean_bad_predictions(W):
         print '* Warning:', bad, 'bad predictions out of', len(W)
 
 
-def pipeline(sc, preprocess_method, selection_method, estimation_method, outputfile, preprocess_args={}, selection_args={}, estimation_args={}, submit=False):
-    exp_train_data, ess_train_data, exp_board_data = load_datasets()
-    gene_list = load_gene_list(PRIORITY_GENE_LIST)
+def pipeline(args):
+    sc = args['sc']
+    filter_method = args['filter']
+    filter_threshold = args['filter_threshold']
+    normalize = args['normalize']
+    feature_selection = args['feature_selection']
+    n_features = args['n_features']
+    selection_args = args['selection_args']
+    estimator = args['estimator']
+    estimation_args = args['estimation_args']
+    submit = args['submit']
+    outputfile = args['outputfile']
+    use_cnv = args['use_cnv']
 
-    print 'pre-processing with:', preprocess_method, str(preprocess_args)
+    datasets = load_datasets(get_cnv=use_cnv)
+    gene_list = datasets['gene_list']
 
-    exp_train_data, exp_board_data = pre_process_datasets(exp_train_data, exp_board_data, preprocess_method, preprocess_args)
+    print 'pre-processing with:', filter_method, 'at', filter_threshold, '. normalize:', normalize
 
-    X = exp_train_data.values.T
+    pre_process_datasets(datasets, filter_method, filter_threshold, normalize, use_cnv)
+
+    feat_train_data = datasets['feat_train_data']
+    feat_board_data = datasets['feat_board_data']
+    ess_train_data = datasets['ess_train_data']
+    X = feat_train_data.values.T
     Y = ess_train_data.values if sc == 'sc1' else ess_train_data.loc[gene_list, :].values
-    Z = exp_board_data.values.T
-    feature_list = exp_board_data.index.values
+    Z = feat_board_data.values.T
+    feature_list = feat_board_data.index.values
+
     print 'features after filtering:', len(feature_list)
 
-    print 'predicting with', selection_method, estimation_method,
+    print 'predicting with', feature_selection,  estimator,
 
     t0 = time()
     if sc == 'sc1':
-        W, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
+        W, features = select_train_predict(X, Y, Z, feature_list, feature_selection, estimator, n_features, selection_args, estimation_args)
 
     if sc == 'sc2':
-        selection_args['n_features'] = 10
-        W, features = select_train_predict(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
+        n_features = 10
+        W, features = select_train_predict(X, Y, Z, feature_list, feature_selection, estimator, n_features, selection_args, estimation_args)
 
     if sc == 'sc3':
-        if estimation_method.startswith('mt'):
-            selection_args['n_features'] = 100
-            W, features = sc3_multitask(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
+        if estimator.startswith('mt'):
+            W, features = sc3_multitask(X, Y, Z, feature_list, feature_selection, estimator, selection_args, estimation_args)
         else:
-            W, features = sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, selection_args, estimation_args)
+            W, features = sc3_top100(X, Y, Z, feature_list, feature_selection, estimator, n_features, selection_args, estimation_args)
 
     t1 = time() - t0
     clean_bad_predictions(W)
 
-    print 'tested', selection_method, estimation_method, 'elapsed', t1, 'secs'
+    print 'tested', feature_selection,  estimator, 'elapsed', t1, 'secs'
 
     index = ess_train_data.index if sc == 'sc1' else gene_list
-    ess_board_data = DataFrame(W, columns=exp_board_data.columns, index=index)
+    ess_board_data = DataFrame(W, columns=feat_board_data.columns, index=index)
     ess_board_data.insert(0, 'Description', index)
     save_gct_data(ess_board_data, outputfile + '.gct')
 

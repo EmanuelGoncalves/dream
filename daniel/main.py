@@ -4,35 +4,42 @@ from multiprocessing import Pool
 from learning import pipeline
 
 
-def call_pipeline(args):
-    pipeline(*args)
-
+def update_dict(x, y):
+    z = x.copy()
+    z.update(y)
+    return z
 
 def run_pipeline():
 
-    sc = 'sc1'
-    preprocess_method = 'cv'
-    preprocess_args = {'t': 0.1}
-    selection_method = 'KBest'
-#    selection_args = {'n_features': 100, 'step': 100}
-    selection_args = {'n_features': 2000}
-    estimation_method = 'rdgcv'
-    estimation_args = {}
-    submit = True
-    outputfile = 'cv01kb2e3rdgcv'
-    multi_threaded = False
+    multi_threaded = True
 
-    args_list = [(sc, preprocess_method, selection_method, estimation_method, outputfile,
-                  preprocess_args, selection_args, estimation_args, submit)]
+    default_args = {
+        'sc': 'sc1',
+        'filter': 'cv',
+        'filter_threshold': (0.1, 0),
+        'use_cnv': False,
+        'normalize': True,
+        'feature_selection': None,
+        'n_features': 5000,
+        'selection_args': {},
+        'estimator': 'lr',
+        'estimation_args': {},
+        'submit': True,
+        'outputfile': 'out'
+    }
+
+    args_list = [update_dict(default_args,
+                             {'outputfile': 'norm_{0}'.format(normalize),
+                              'normalize': normalize})
+                 for normalize in [True, False]]
 
     if multi_threaded:
         p = Pool()
-        p.map(call_pipeline, args_list)
+        p.map(pipeline, args_list)
     else:
-        map(call_pipeline, args_list)
+        map(pipeline, args_list)
 
 
 if __name__ == '__main__':
-    #average_by_cell_line()
     run_pipeline()
 
