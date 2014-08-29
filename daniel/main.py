@@ -11,12 +11,12 @@ def update_dict(x, y):
 
 def run_pipeline():
 
-    multi_threaded = True
+    multi_threaded = False
 
     default_args = {
         'sc': 'sc1',
         'filter': 'cv',
-        'filter_threshold': (0.1, 0.5),
+        'filter_threshold': (0.2, 0.5),
         'use_cnv': False,
         'normalize': True,
         'feature_selection': None,
@@ -26,7 +26,7 @@ def run_pipeline():
         'estimation_args': {},
         'submit': True,
         'outputfile': 'out',
-        'split_train_set': False
+        'split_train_set': True
     }
 
     args_list = [update_dict(default_args,
@@ -35,7 +35,7 @@ def run_pipeline():
                               'normalize': bool(normalize)})
                  for normalize in [0, 1]
                  for use_cnv in [0, 1]
-                 for method in ['par', 'rdg']]
+                 for method in ['rdg']]
 
     if multi_threaded:
         p = Pool()

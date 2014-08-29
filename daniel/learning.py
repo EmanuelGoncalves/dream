@@ -225,7 +225,7 @@ def pipeline(args):
     if split_train_set:
         split_datasets(datasets, use_cnv)
 
-    print 'pre-processing with:', filter_method, 'at', filter_threshold, '. normalize:', normalize
+    print 'pre-processing with:', filter_method, 'at', filter_threshold, 'normalize:', normalize
 
     pre_process_datasets(datasets, filter_method, filter_threshold, normalize, use_cnv)
 
