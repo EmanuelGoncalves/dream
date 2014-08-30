@@ -16,7 +16,7 @@ def run_pipeline():
     default_args = {
         'sc': 'sc1',
         'filter': 'cv',
-        'filter_threshold': (0.2, 0.5),
+        'filter_threshold': (0.5, 0.5),
         'use_cnv': False,
         'normalize': True,
         'feature_selection': None,
@@ -24,9 +24,9 @@ def run_pipeline():
         'selection_args': {},
         'estimator': 'rdg',
         'estimation_args': {},
-        'submit': True,
+        'submit': False,
         'outputfile': 'out',
-        'split_train_set': True
+        'split_train_set': False
     }
 
     args_list = [update_dict(default_args,

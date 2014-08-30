@@ -90,16 +90,22 @@ def load_datasets(phase='phase2', get_cnv=False):
 
     return datasets
 
-def submit_to_challenge(filename, challenge, label):
+def submit_to_challenge(filename, challenge, label, retry=True):
 
-    client = Synapse()
-    client.login()
-    evaluation = client.getEvaluation(CODES[challenge])
-#    client.joinEvaluation(evaluation)
-    filename = filename + '.gct' if challenge == 'sc1' else filename + '.zip'
-    myfile = File(RESULTS_FOLDER + filename, parent=PROJECT_ID)
-    myfile = client.store(myfile)
-    client.submit(evaluation, myfile, name=label, teamName=TEAM)
+    try:
+        client = Synapse()
+        client.login()
+        evaluation = client.getEvaluation(CODES[challenge])
+    #    client.joinEvaluation(evaluation)
+        filename = filename + '.gct' if challenge == 'sc1' else filename + '.zip'
+        myfile = File(RESULTS_FOLDER + filename, parent=PROJECT_ID)
+        myfile = client.store(myfile)
+        client.submit(evaluation, myfile, name=label, teamName=TEAM)
+    except:
+        if retry:
+            submit_to_challenge(filename, challenge, label, retry=False)
+        else:
+            print 'failed to submit', label, 'to', challenge
 
 def zip_files(output, filelist):
     zipfile = ZipFile(RESULTS_FOLDER + output + '.zip', 'w')
