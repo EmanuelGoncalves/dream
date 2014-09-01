@@ -3,9 +3,11 @@ __author__ = 'emanuel'
 import numpy as np
 import operator
 from scipy.stats import spearmanr
-from sklearn.linear_model import RidgeCV
+from sklearn.linear_model import RidgeCV, PassiveAggressiveRegressor
+from sklearn.feature_selection import VarianceThreshold
 from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectKBest, f_regression
+from sklearn.cross_validation import ShuffleSplit
 from sklearn.metrics import make_scorer
 from pandas import DataFrame, Series
 from dream_2014_functions import read_data_sets
@@ -33,8 +35,13 @@ samples = pred_ess.axes[1]
 X_train_pre = train_exp
 X_test_pre = pred_exp
 
+var_thres = 0.65
+filter_thres = VarianceThreshold(var_thres).fit(X_train_pre)
+X_train_pre = X_train_pre.loc[:, filter_thres.get_support()]
+X_test_pre = X_test_pre.loc[:, filter_thres.get_support()]
+
 # Prepare features
-features = X_train_pre.axes[1]
+features = X_train_pre.columns
 important_features = []
 
 for gene in prioritized_genes:
@@ -59,28 +66,35 @@ important_features = Series([feature for feature_list in important_features for 
 important_features_top_100 = [x for x in important_features.value_counts().head(100).index]
 
 predictions = DataFrame(None, index=prioritized_genes, columns=samples)
-my_spearm_cor_func = make_scorer(spearm_cor_func, greater_is_better=True)
+spearman = make_scorer(spearm_cor_func, greater_is_better=True)
 
 # Assemble prediction variables
 X_train = X_train_pre.loc[:, important_features_top_100]
 X_test = X_test_pre.loc[:, important_features_top_100]
 
-# Normalization
-scaler = StandardScaler().fit(X_train)
-X_train = scaler.transform(X_train)
-X_test = scaler.transform(X_test)
-
 for gene in prioritized_genes:
     y_train = train_ess.ix[:, gene]
 
-    # Estimation
-    clf = RidgeCV(scoring=my_spearm_cor_func)
-    y_test_pred = clf.fit(X_train, y_train).predict(X_test)
+    y_preds_test = []
+    y_preds_scores = []
+
+    # Training
+    cv = ShuffleSplit(len(y_train), n_iter=5)
+    for train_i, test_i in cv:
+        clf = PassiveAggressiveRegressor(epsilon=0.01, n_iter=3).fit(X_train.ix[train_i, :], y_train[train_i])
+        y_preds_scores.append(spearm_cor_func(clf.predict(X_train.ix[test_i, :]), y_train[test_i]))
+        y_preds_test.append(clf.predict(X_test))
+
+    y_preds_scores = Series(y_preds_scores)
+    y_preds_test = DataFrame(y_preds_test)
+
+    # Predict
+    y_pred = np.mean(y_preds_test[y_preds_scores.notnull()], axis=0).values
 
     print gene, X_train.shape
 
     # Store results
-    predictions.ix[gene] = y_test_pred
+    predictions.ix[gene] = y_pred
 
 
 # Calculate score

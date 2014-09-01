@@ -9,7 +9,8 @@ from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regressi
 from sklearn.metrics import make_scorer
 from sklearn.grid_search import GridSearchCV
 from sklearn.pipeline import Pipeline
-from pandas import DataFrame
+from sklearn.cross_validation import ShuffleSplit
+from pandas import DataFrame, Series
 from dream_2014_functions import read_data_sets, save_gct_data, write_features, submit_solution, ev_code_sc2
 
 
@@ -30,7 +31,13 @@ predictions_features = {}
 X_train_pre = train_exp
 X_test_pre = leader_exp
 
-features = X_train_pre.axes[1]
+# Filter by coeficient variation
+var_thres = 0.7
+filter_thres = VarianceThreshold(var_thres).fit(X_train_pre)
+X_train_pre = X_train_pre.loc[:, filter_thres.get_support()]
+X_test_pre = X_test_pre.loc[:, filter_thres.get_support()]
+
+features = X_train_pre.columns.values
 
 for gene in prioritized_genes:
     # Assemble prediction variables
@@ -44,15 +51,26 @@ for gene in prioritized_genes:
     X_test = fs.transform(X_test)
     gene_features = features[fs.get_support()]
 
-    # Estimation
-    #clf = RidgeCV(gcv_mode='auto')
-    clf = PassiveAggressiveRegressor(epsilon=0.01)
-    y_test_pred = clf.fit(X_train, y_train).predict(X_test)
+    y_preds_test = []
+    y_preds_scores = []
+
+    # Training
+    cv = ShuffleSplit(len(y_train), n_iter=5)
+    for train_i, test_i in cv:
+        clf = RidgeCV(gcv_mode='auto').fit(X_train[train_i], y_train[train_i])
+        y_preds_scores.append(spearm_cor_func(clf.predict(X_train[test_i]), y_train[test_i]))
+        y_preds_test.append(clf.predict(X_test))
+
+    y_preds_scores = Series(y_preds_scores)
+    y_preds_test = DataFrame(y_preds_test)
+
+    # Predict
+    y_pred = np.mean(y_preds_test[y_preds_scores.notnull()], axis=0).values
 
     print gene, X_train.shape
 
     # Store results
-    predictions.ix[gene] = y_test_pred
+    predictions.ix[gene] = y_pred
     predictions_features[gene] = gene_features
 
 filename_gct = save_gct_data(predictions, submission_filename_prefix)

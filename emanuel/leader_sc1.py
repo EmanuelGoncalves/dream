@@ -30,7 +30,7 @@ X_train_pre = train_exp
 X_test_pre = leader_exp
 
 # Filter by coeficient variation
-var_thres = VarianceThreshold(train_exp.var().quantile(0.50)).fit(X_train_pre)
+var_thres = VarianceThreshold(0.65).fit(X_train_pre)
 X_train_pre = var_thres.transform(X_train_pre)
 X_test_pre = var_thres.transform(X_test_pre)
 
@@ -53,7 +53,7 @@ for gene in genes:
     y_preds_scores = []
 
     # Training
-    cv = ShuffleSplit(len(y_train), n_iter=10)
+    cv = ShuffleSplit(len(y_train), n_iter=5)
     for train_i, test_i in cv:
         clf = PassiveAggressiveRegressor(epsilon=best_epsilon, n_iter=best_n_iter).fit(X_train[train_i], y_train[train_i])
         y_preds_scores.append(spearm_cor_func(clf.predict(X_train[test_i]), y_train[test_i]))

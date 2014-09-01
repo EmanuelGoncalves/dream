@@ -85,7 +85,7 @@ X_train_pre = train_exp
 X_test_pre = pred_exp
 
 # Filter by coeficient variation
-var_thres = VarianceThreshold(train_exp.var().quantile(0.50)).fit(X_train_pre)
+var_thres = VarianceThreshold(0.8).fit(X_train_pre)
 X_train_pre = var_thres.transform(X_train_pre)
 X_test_pre = var_thres.transform(X_test_pre)
 

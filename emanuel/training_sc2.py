@@ -44,7 +44,7 @@ predictions = DataFrame(None, index=prioritized_genes, columns=pred_ess.axes[1])
 spearman = make_scorer(spearm_cor_func, greater_is_better=True)
 
 # Filter by coeficient variation
-var_thres = Series(X_train_pre.var(axis=0)).quantile(0.50)
+var_thres = 0.65
 filter_thres = VarianceThreshold(var_thres).fit(X_train_pre)
 X_train_pre = filter_thres.transform(X_train_pre)
 X_test_pre = filter_thres.transform(X_test_pre)
@@ -59,8 +59,21 @@ for gene in prioritized_genes:
     X_train = fs.transform(X_train)
     X_test = fs.transform(X_test)
 
-    clf = PassiveAggressiveRegressor(epsilon=0.01, n_iter=5).fit(X_train, y_train)
-    y_pred = clf.predict(X_test)
+    y_preds_test = []
+    y_preds_scores = []
+
+    # Training
+    cv = ShuffleSplit(len(y_train), n_iter=5)
+    for train_i, test_i in cv:
+        clf = RidgeCV(gcv_mode='auto').fit(X_train[train_i], y_train[train_i])
+        y_preds_scores.append(spearm_cor_func(clf.predict(X_train[test_i]), y_train[test_i]))
+        y_preds_test.append(clf.predict(X_test))
+
+    y_preds_scores = Series(y_preds_scores)
+    y_preds_test = DataFrame(y_preds_test)
+
+    # Predict
+    y_pred = np.mean(y_preds_test[y_preds_scores.notnull()], axis=0).values
 
     predictions.ix[gene] = y_pred
 
