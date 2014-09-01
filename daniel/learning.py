@@ -269,7 +269,7 @@ def pipeline(args):
     print 'tested', feature_selection,  estimator, 'elapsed', t1, 'secs'
 
     if split_train_set:
-        W0 = datasets['ess_score_data'].values
+        W0 = datasets['ess_score_data'].values if sc == 'sc1' else datasets['ess_score_data'].loc[gene_list, :].values
         if max_predictions:
             W0 = W0[::len(W0)/max_predictions][:max_predictions]
         score = training_score(W0, W)
