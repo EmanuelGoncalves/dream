@@ -71,7 +71,7 @@ for gene in prioritized_genes:
     # Training
     cv = ShuffleSplit(len(y_train), n_iter=5)
     for train_i, test_i in cv:
-        clf = PassiveAggressiveRegressor(epsilon=0.01, n_iter=3).fit(X_train.ix[train_i, :], y_train[train_i])
+        clf = PassiveAggressiveRegressor(epsilon=0.01, n_iter=7).fit(X_train.ix[train_i, :], y_train[train_i])
         y_preds_scores.append(spearm_cor_func(clf.predict(X_train.ix[test_i, :]), y_train[test_i]))
         y_preds_test.append(clf.predict(X_test))
 

@@ -44,7 +44,7 @@ predictions = DataFrame(None, index=prioritized_genes, columns=pred_ess.axes[1])
 spearman = make_scorer(spearm_cor_func, greater_is_better=True)
 
 # Filter by coeficient variation
-var_thres = 0.65
+var_thres = 0.60
 filter_thres = VarianceThreshold(var_thres).fit(X_train_pre)
 X_train_pre = filter_thres.transform(X_train_pre)
 X_test_pre = filter_thres.transform(X_test_pre)

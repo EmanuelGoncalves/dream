@@ -73,8 +73,8 @@ pred_cnv = cnv.iloc[range(25), ]
 pred_ess = ess.iloc[range(25), ].T
 
 # Predicted genes
-# genes = pred_ess.axes[0]
-genes = prioritized_genes
+genes = pred_ess.axes[0]
+# genes = prioritized_genes
 samples = pred_ess.axes[1]
 
 # Configurations
@@ -147,7 +147,8 @@ for gene in genes:
 
     predictions.loc[gene, :] = y_pred
 
-    print gene, X_train.shape, spearmanr(predictions.loc[gene, :], pred_ess.loc[gene])
+    if spearmanr(predictions.loc[gene, :], pred_ess.loc[gene])[0] < -0.20:
+        print gene
 
 print predictions
 
