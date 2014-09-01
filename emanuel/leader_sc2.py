@@ -8,6 +8,7 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regression
 from sklearn.metrics import make_scorer
 from sklearn.grid_search import GridSearchCV
+from sklearn.pipeline import Pipeline
 from pandas import DataFrame
 from dream_2014_functions import read_data_sets, save_gct_data, write_features, submit_solution, ev_code_sc2
 
@@ -23,6 +24,7 @@ train_exp, train_cnv, train_ess, leader_exp, leader_cnv, prioritized_genes = rea
 
 # Configurations
 predictions = DataFrame(None, index=prioritized_genes, columns=leader_exp.axes[0])
+spearman = make_scorer(spearm_cor_func, greater_is_better=True)
 predictions_features = {}
 
 X_train_pre = train_exp
