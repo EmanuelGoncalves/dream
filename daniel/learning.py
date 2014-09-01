@@ -7,7 +7,7 @@ from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
-from sklearn.linear_model import LinearRegression, Ridge, Lasso, ElasticNet, PassiveAggressiveRegressor, \
+from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso, ElasticNet, PassiveAggressiveRegressor, \
     RidgeCV, LassoCV, ElasticNetCV, MultiTaskLasso, MultiTaskElasticNet
 from sklearn.feature_selection import RFE, SelectKBest, f_regression, VarianceThreshold
 from time import time
@@ -19,6 +19,7 @@ from datasets import RESULTS_FOLDER
 ESTIMATORS = {'knn': KNeighborsRegressor,
               'svm': SVR,
               'lr': LinearRegression,
+              'lgr': LogisticRegression,
               'par': PassiveAggressiveRegressor,
               'rdg': Ridge,
               'lss': Lasso,
@@ -61,8 +62,14 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
             cnv_train_data = cnv_train_data.loc[selector.get_support(), :]
             cnv_board_data = cnv_board_data.loc[selector.get_support(), :]
 
-    feat_train_data = exp_train_data.append(cnv_train_data) if use_cnv else exp_train_data
-    feat_board_data = exp_board_data.append(cnv_board_data) if use_cnv else exp_board_data
+    if use_cnv:
+        feat_train_data = exp_train_data.append(cnv_train_data)
+        feat_board_data = exp_board_data.append(cnv_board_data)
+        print 'features after filtering', exp_train_data.shape[0], '+', cnv_train_data.shape[0], '=', feat_train_data.shape[0]
+    else:
+        feat_train_data = exp_train_data
+        feat_board_data = exp_board_data
+        print 'features after filtering', exp_train_data.shape[0]
 
     if normalize:
         scaler = StandardScaler().fit(feat_train_data.values.T)
@@ -142,7 +149,6 @@ def sc3_multitask(X, Y, Z, feature_list, selection_method, estimator_method, sel
     if selection_method == 'kb':
         print 'Cannot use KBest with multi task methods'
 
-
     return W.T, features
 
 
@@ -218,6 +224,7 @@ def pipeline(args):
     outputfile = args['outputfile']
     use_cnv = args['use_cnv']
     split_train_set = args['split_train_set']
+    max_predictions = args['max_predictions']
 
     datasets = load_datasets(get_cnv=use_cnv)
     gene_list = datasets['gene_list']
@@ -237,9 +244,10 @@ def pipeline(args):
     Z = feat_board_data.values.T
     feature_list = feat_board_data.index.values
 
-    print 'features after filtering:', len(feature_list)
+    if max_predictions and split_train_set:
+        Y = Y[::len(Y)/max_predictions][:max_predictions]
 
-    print 'predicting with', feature_selection,  estimator,
+    print 'predicting with', feature_selection, '(', n_features, ')',  estimator,
 
     t0 = time()
     if sc == 'sc1':
@@ -262,6 +270,8 @@ def pipeline(args):
 
     if split_train_set:
         W0 = datasets['ess_score_data'].values
+        if max_predictions:
+            W0 = W0[::len(W0)/max_predictions][:max_predictions]
         score = training_score(W0, W)
         print 'scored:', score
 
