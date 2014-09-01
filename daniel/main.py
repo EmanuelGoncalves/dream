@@ -14,28 +14,24 @@ def run_pipeline():
     multi_threaded = False
 
     default_args = {
-        'sc': 'sc1',
-        'filter': 'cv',
-        'filter_threshold': (0.5, 0.5),
+        'sc': 'sc3',
+        'filter': 'var',
+        'filter_threshold': (0, 0),
         'use_cnv': False,
-        'normalize': True,
-        'feature_selection': None,
-        'n_features': 5000,
+        'normalize': False,
+        'feature_selection': 'kb',
+        'n_features': 100,
         'selection_args': {},
-        'estimator': 'rdg',
+        'estimator': 'rdgcv',
         'estimation_args': {},
-        'submit': False,
+        'submit': True,
         'outputfile': 'out',
-        'split_train_set': False
+        'split_train_set': False,
+        'max_predictions': 1000
     }
 
     args_list = [update_dict(default_args,
-                             {'outputfile': 'cn{0}_norm{1}_cv01-05_{2}'.format(use_cnv, normalize, method),
-                              'use_cnv': bool(use_cnv),
-                              'normalize': bool(normalize)})
-                 for normalize in [0, 1]
-                 for use_cnv in [0, 1]
-                 for method in ['rdg']]
+                             {'outputfile': 'best_of_emanuel'})]
 
     if multi_threaded:
         p = Pool()
