@@ -1,5 +1,52 @@
 source("dream2014-functions.R")
 
+#### READING DATA ####
+
+# checking cell line annotations for the different phases
+cell.line.annot.tr.1 = read.annotations("data/phase1/Cell_line_annotation_training.txt")
+dim(cell.line.annot.tr.1)
+names(cell.line.annot.tr.1)
+names.lines.tr.1 = cell.line.annot.tr.1$Name
+
+cell.line.annot.ts.1 = read.annotations("data/phase1/Cell_line_annotation_leaderboard.txt")
+dim(cell.line.annot.ts.1)
+names(cell.line.annot.ts.1)
+names.lines.ts.1 = cell.line.annot.ts.1$Name
+
+cell.line.annot.tr.2 = read.annotations("data/phase2/Cell_line_annotation_training_phase2.txt")
+dim(cell.line.annot.tr.2)
+names.lines.tr.2 = cell.line.annot.tr.2$Name
+names.lines.tr.2[5] = toupper(names.lines.tr.2[5]) # seems to be an error
+
+shared.tr = intersect(names.lines.tr.1, names.lines.tr.2)
+length(shared.tr)
+# 45
+
+cell.line.annot.ts.2 = read.annotations("data/phase2/Cell_line_annotation_leaderboard_phase2.txt")
+dim(cell.line.annot.ts.2)
+names.lines.ts.2 = cell.line.annot.ts.2$Name
+
+shared.ts = intersect(names.lines.ts.1, names.lines.ts.2)
+length(shared.ts)
+# 22
+
+cell.line.annot.tr.3 = read.annotations("data/phase3/Cell_line_annotation_training_phase3.txt")
+dim(cell.line.annot.tr.3)
+names.lines.tr.3 = cell.line.annot.tr.3$Name
+
+shared.tr.3 = intersect(names.lines.tr.3, names.lines.tr.2)
+length(shared.tr.3)
+# 66
+
+length(intersect(new.tr.3, names.lines.ts.2))
+# 33
+
+cell.line.annot.ts.3 = read.annotations("data/phase3/Cell_line_annotation_finaltest_phase3.txt")
+dim(cell.line.annot.ts.3)
+names.lines.ts.3 = cell.line.annot.ts.3$Name
+
+
+
 # Loading expression data
 
 exp.train.raw = read.gct.file("data/CCLE_expression_training.gct")
@@ -247,3 +294,5 @@ for (g in 1:ncol(output.tr.mat) ) {
 }
 
 write.res.gct(res.lasso, colnames(output.tr.mat), rownames(input.ts.mat), outfile = "submissions/umebi-subm6.gct")
+
+ 
