@@ -12,8 +12,9 @@ CODES = {'sc1': '2571160', 'sc2': '2571162', 'sc3': '2571164'}
 
 RESULTS_FOLDER = '../submissions/'
 
-PHASE1_DATA = '../data/phase2/'
+PHASE1_DATA = '../data/phase1/'
 PHASE2_DATA = '../data/phase2/'
+PHASE3_DATA = '../data/phase3/'
 
 CNV_TRAINING_DATA_PH1 = PHASE1_DATA + 'CCLE_copynumber_training.gct'
 EXP_TRAINING_DATA_PH1 = PHASE1_DATA + 'CCLE_expression_training.gct'
@@ -32,6 +33,17 @@ EXP_LEADERBOARD_DATA_PH2 = PHASE2_DATA + 'CCLE_expression_leaderboard_phase2.gct
 CELL_LINES_TRAINING_PH2 = PHASE2_DATA + 'Cell_line_annotation_training_phase2.txt'
 CELL_LINES_LEADERBOARD_PH2 = PHASE2_DATA + 'Cell_line_annotation_leaderboard_phase2.txt'
 PRIORITY_GENE_LIST_PH2 = PHASE2_DATA + 'prioritized_gene_list_phase2.txt'
+
+CNV_TRAINING_DATA_PH3 = PHASE3_DATA + 'CCLE_copynumber_training_phase3.gct'
+EXP_TRAINING_DATA_PH3 = PHASE3_DATA + 'CCLE_expression_training_phase3.gct'
+ESS_TRAINING_DATA_PH3 = PHASE3_DATA + 'Achilles_v2.11_training_phase3.gct'
+MUT_TRAINING_DATA_PH3 = PHASE3_DATA + 'CCLE_hybridmutation_training_phase3.gct'
+CNV_LEADERBOARD_DATA_PH3 = PHASE3_DATA + 'CCLE_copynumber_finaltest_phase3.gct'
+EXP_LEADERBOARD_DATA_PH3 = PHASE3_DATA + 'CCLE_expression_finaltest_phase3.gct'
+MUT_LEADERBOARD_DATA_PH3 = PHASE3_DATA + 'CCLE_hybridmutation_finaltest_phase3.gct'
+CELL_LINES_TRAINING_PH3 = PHASE3_DATA + 'Cell_line_annotation_training_phase3.txt'
+CELL_LINES_LEADERBOARD_PH3 = PHASE3_DATA + 'Cell_line_annotation_finaltest_phase3.txt'
+PRIORITY_GENE_LIST_PH3 = PHASE3_DATA + 'prioritized_gene_list_phase3.txt'
 
 
 def load_gct_data(filename):
@@ -59,7 +71,7 @@ def load_gene_list(filename):
     return data.values[:,0]
 
 
-def load_datasets(phase='phase2', get_cnv=False):
+def load_datasets(phase='phase2', get_cnv=False, get_mut=False):
 
     datasets = {}
 
@@ -79,6 +91,16 @@ def load_datasets(phase='phase2', get_cnv=False):
         cnv_board_data = CNV_LEADERBOARD_DATA_PH2
         gene_list = PRIORITY_GENE_LIST_PH2
 
+    if phase == 'phase3':
+        exp_train_data = EXP_TRAINING_DATA_PH3
+        ess_train_data = ESS_TRAINING_DATA_PH3
+        exp_board_data = EXP_LEADERBOARD_DATA_PH3
+        cnv_train_data = CNV_TRAINING_DATA_PH3
+        cnv_board_data = CNV_LEADERBOARD_DATA_PH3
+        mut_train_data = CNV_TRAINING_DATA_PH3
+        mut_board_data = CNV_LEADERBOARD_DATA_PH3
+        gene_list = PRIORITY_GENE_LIST_PH3
+
     datasets['exp_train_data'] = load_gct_data(exp_train_data)
     datasets['ess_train_data'] = load_gct_data(ess_train_data)
     datasets['exp_board_data'] = load_gct_data(exp_board_data)
@@ -88,6 +110,10 @@ def load_datasets(phase='phase2', get_cnv=False):
         datasets['cnv_train_data'] = load_gct_data(cnv_train_data)
         datasets['cnv_board_data'] = load_gct_data(cnv_board_data)
 
+    if phase == 'phase3' and get_mut:
+        datasets['mut_train_data'] = load_gct_data(mut_train_data)
+        datasets['mut_board_data'] = load_gct_data(mut_board_data)
+
     return datasets
 
 def submit_to_challenge(filename, challenge, label, retry=True):
@@ -96,7 +122,6 @@ def submit_to_challenge(filename, challenge, label, retry=True):
         client = Synapse()
         client.login()
         evaluation = client.getEvaluation(CODES[challenge])
-    #    client.joinEvaluation(evaluation)
         filename = filename + '.gct' if challenge == 'sc1' else filename + '.zip'
         myfile = File(RESULTS_FOLDER + filename, parent=PROJECT_ID)
         myfile = client.store(myfile)

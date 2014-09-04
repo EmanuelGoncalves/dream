@@ -11,33 +11,33 @@ def update_dict(x, y):
 
 def run_pipeline():
 
-    multi_threaded = True
+    multi_threaded = True                 # run multiple processes per configuration ?
 
     default_args = {
-        'sc': 'sc2',
-        'filter': 'var',
-        'filter_threshold': (0.65, 1),
-        'use_cnv': False,
-        'normalize': False,
-        'feature_selection': 'kb',
-        'n_features': 1000,
-        'selection_args': {},
-        'estimator': 'rdgcv',
-        'estimation_args': {},
-        'submit': True,
-        'outputfile': 'out',
-        'split_train_set': False,
-        'max_predictions': 100
+        'phase': 'phase3',                # challenge phase
+        'sc': 'sc1',                      # sub-challenge
+        'filter': 'var',                  # filtering method (None / variance / coefficient of variation)
+        'filter_threshold': (0.65, 1),    # filter threshold (gene expression, copy number varation)
+        'use_cnv': False,                 # use copy number variation ?
+        'use_mut': False,                 # use mutation data ?
+        'normalize': False,               # normalize features ?
+        'feature_selection': None,        # feature selection (None / KBest (kb) / Recursive Feature Elimination (rfe))
+        'n_features': 1000,               # select number of maximum features
+        'selection_args': {},             # args to pass to feature selection method
+        'estimator': 'rdgcv',             # estimation method (knn, svm, lr, lgr, par, rdg, lss, eln, rdgcv, lsscv, elncv, mtlss, mteln)
+        'estimation_args': {},            # args to pass to estimation method
+        'submit': False,                  # submit result to challenge ?
+        'outputfile': 'out',              # output file name
+        'split_train_set': True,          # split training set for score calculation ?
+        'max_predictions': 100            # limit number of predictions during training (for speed)
     }
 
     args_list = [update_dict(default_args,
-                             {'outputfile': 'n{0}_cnv{1}_{2}'.format(norm, cnv, method),
-                             'normalize': bool(norm),
-                             'use_cnv': bool(cnv),
+                             {'outputfile': 'mut{0}_{0}'.format(mut, method),
+                             'use_mut': bool(mut),
                              'estimator': method})
-                 for method in ['rdgcv', 'svm']
-                 for norm in [0, 1]
-                 for cnv in [0, 1]]
+                 for method in ['rdgcv', 'svm', 'par']
+                 for mut in [0, 1]]
 
     if multi_threaded:
         p = Pool()

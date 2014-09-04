@@ -32,7 +32,7 @@ ESTIMATORS = {'knn': KNeighborsRegressor,
               }
 
 
-def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normalize=True, use_cnv=False):
+def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normalize=True, use_cnv=False, use_mut=False):
 
     exp_train_data = datasets['exp_train_data']
     exp_board_data = datasets['exp_board_data']
@@ -75,6 +75,10 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
         scaler = StandardScaler().fit(feat_train_data.values.T)
         feat_train_data.values[:,:] = scaler.transform(feat_train_data.values.T).T
         feat_board_data.values[:,:] = scaler.transform(feat_board_data.values.T).T
+
+    if use_mut:
+        feat_train_data = feat_train_data.append(datasets['mut_train_data'])
+        feat_board_data = feat_board_data.append(datasets['mut_board_data'])
 
     datasets['feat_train_data'] = feat_train_data
     datasets['feat_board_data'] = feat_board_data
@@ -211,22 +215,24 @@ def split_datasets(datasets, use_cnv):
 
 
 def pipeline(args):
+    phase = args['phase']
     sc = args['sc']
     filter_method = args['filter']
     filter_threshold = args['filter_threshold']
     normalize = args['normalize']
     feature_selection = args['feature_selection']
-    n_features = args['n_features']
+    n_features = args['n_features'] if sc != 'sc2' else 10
     selection_args = args['selection_args']
     estimator = args['estimator']
     estimation_args = args['estimation_args']
     submit = args['submit']
     outputfile = args['outputfile']
     use_cnv = args['use_cnv']
+    use_mut = args['use_mut'] if phase == 'phase3' else False
     split_train_set = args['split_train_set']
     max_predictions = args['max_predictions']
 
-    datasets = load_datasets(get_cnv=use_cnv)
+    datasets = load_datasets(phase=phase, get_cnv=use_cnv, get_mut=use_mut)
     gene_list = datasets['gene_list']
 
     if split_train_set:
@@ -254,7 +260,6 @@ def pipeline(args):
         W, features = select_train_predict(X, Y, Z, feature_list, feature_selection, estimator, n_features, selection_args, estimation_args)
 
     if sc == 'sc2':
-        n_features = 10
         W, features = select_train_predict(X, Y, Z, feature_list, feature_selection, estimator, n_features, selection_args, estimation_args)
 
     if sc == 'sc3':
