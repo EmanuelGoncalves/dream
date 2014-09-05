@@ -20,11 +20,11 @@ def run_pipeline():
         'filter_threshold': (0.65, 1),    # filter threshold (gene expression, copy number varation)
         'use_cnv': False,                 # use copy number variation ?
         'use_mut': False,                 # use mutation data ?
-        'normalize': True,                # normalize features ?
-        'feature_selection': None,        # feature selection (None / KBest (kb) / Recursive Feature Elimination (rfe))
-        'n_features': 1000,               # select number of maximum features
+        'normalize': False,                # normalize features ?
+        'feature_selection': 'kb',        # feature selection (None / KBest (kb) / Recursive Feature Elimination (rfe))
+        'n_features': 3500,               # select number of maximum features
         'selection_args': {},             # args to pass to feature selection method
-        'estimator': 'rdgcv',             # estimation method (knn, svm, lr, lgr, par, rdg, lss, eln, rdgcv, lsscv, elncv, mtlss, mteln)
+        'estimator': 'woc',               # estimation method (knn, svm, lr, lgr, par, rdg, lss, eln, rdgcv, lsscv, elncv, mtlss, mteln)
         'estimation_args': {},            # args to pass to estimation method
         'submit': False,                  # submit result to challenge ?
         'outputfile': 'out',              # output file name
@@ -33,11 +33,10 @@ def run_pipeline():
     }
 
     args_list = [update_dict(default_args,
-                             {'outputfile': 'mut{0}_{0}'.format(mut, method),
-                             'use_mut': bool(mut),
-                             'estimator': method})
-                 for method in ['rdgcv', 'par']
-                 for mut in [0, 1]]
+                             {'estimation_args': {'estimators': combinations} } )
+                 for combinations in [['rdgcv'],
+                                      ['par'],
+                                      ['rdgcv', 'par']]]
 
     if multi_threaded:
         p = Pool()

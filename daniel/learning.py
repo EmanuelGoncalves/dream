@@ -31,6 +31,19 @@ ESTIMATORS = {'knn': KNeighborsRegressor,
               'mteln': MultiTaskElasticNet,
               }
 
+class WisdomOfCrowds():
+
+    def __init__(self, estimators):
+        self.estimators = [ESTIMATORS[estimator]() for estimator in estimators]
+
+    def fit(self, X, y):
+        [estimator.fit(X, y) for estimator in self.estimators]
+
+    def predict(self, X):
+        Ys = [estimator.predict(X) for estimator in self.estimators]
+        return mean(Ys, 0)
+
+ESTIMATORS['woc'] = WisdomOfCrowds
 
 def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normalize=True, use_cnv=False, use_mut=False):
 
@@ -71,14 +84,16 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
         feat_board_data = exp_board_data
         print 'features after filtering', exp_train_data.shape[0]
 
+    if use_mut:
+        feat_train_data = feat_train_data.append(datasets['mut_train_data'])
+        feat_board_data = feat_board_data.append(datasets['mut_board_data'])
+
     if normalize:
         scaler = StandardScaler().fit(feat_train_data.values.T)
         feat_train_data.values[:,:] = scaler.transform(feat_train_data.values.T).T
         feat_board_data.values[:,:] = scaler.transform(feat_board_data.values.T).T
 
-    if use_mut:
-        feat_train_data = feat_train_data.append(datasets['mut_train_data'])
-        feat_board_data = feat_board_data.append(datasets['mut_board_data'])
+
 
     datasets['feat_train_data'] = feat_train_data
     datasets['feat_board_data'] = feat_board_data
@@ -256,7 +271,7 @@ def pipeline(args):
 
     print 'pre-processing with:', filter_method, 'at', filter_threshold, 'normalize:', normalize, 'use_cnv', use_cnv, 'use_mut', use_mut
 
-    pre_process_datasets(datasets, filter_method, filter_threshold, normalize, use_cnv)
+    pre_process_datasets(datasets, filter_method, filter_threshold, normalize, use_cnv, use_mut)
 
     feat_train_data = datasets['feat_train_data']
     feat_board_data = datasets['feat_board_data']

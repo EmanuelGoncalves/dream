@@ -97,8 +97,8 @@ def load_datasets(phase='phase2', get_cnv=False, get_mut=False):
         exp_board_data = EXP_LEADERBOARD_DATA_PH3
         cnv_train_data = CNV_TRAINING_DATA_PH3
         cnv_board_data = CNV_LEADERBOARD_DATA_PH3
-        mut_train_data = CNV_TRAINING_DATA_PH3
-        mut_board_data = CNV_LEADERBOARD_DATA_PH3
+        mut_train_data = MUT_TRAINING_DATA_PH3
+        mut_board_data = MUT_LEADERBOARD_DATA_PH3
         gene_list = PRIORITY_GENE_LIST_PH3
 
     datasets['exp_train_data'] = load_gct_data(exp_train_data)
@@ -111,8 +111,8 @@ def load_datasets(phase='phase2', get_cnv=False, get_mut=False):
         datasets['cnv_board_data'] = load_gct_data(cnv_board_data)
 
     if phase == 'phase3' and get_mut:
-        datasets['mut_train_data'] = load_gct_data(mut_train_data)
-        datasets['mut_board_data'] = load_gct_data(mut_board_data)
+        datasets['mut_train_data'] = load_gct_data(mut_train_data).fillna(0.5)
+        datasets['mut_board_data'] = load_gct_data(mut_board_data).fillna(0.5)
 
     return datasets
 
