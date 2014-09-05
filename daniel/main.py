@@ -11,7 +11,7 @@ def update_dict(x, y):
 
 def run_pipeline():
 
-    multi_threaded = True                 # run multiple processes per configuration ?
+    multi_threaded = False                # run multiple processes per configuration ?
 
     default_args = {
         'phase': 'phase3',                # challenge phase
@@ -20,7 +20,7 @@ def run_pipeline():
         'filter_threshold': (0.65, 1),    # filter threshold (gene expression, copy number varation)
         'use_cnv': False,                 # use copy number variation ?
         'use_mut': False,                 # use mutation data ?
-        'normalize': False,               # normalize features ?
+        'normalize': True,                # normalize features ?
         'feature_selection': None,        # feature selection (None / KBest (kb) / Recursive Feature Elimination (rfe))
         'n_features': 1000,               # select number of maximum features
         'selection_args': {},             # args to pass to feature selection method
@@ -29,14 +29,14 @@ def run_pipeline():
         'submit': False,                  # submit result to challenge ?
         'outputfile': 'out',              # output file name
         'split_train_set': True,          # split training set for score calculation ?
-        'max_predictions': 100            # limit number of predictions during training (for speed)
+        'max_predictions': None           # limit number of predictions during training (for speed)
     }
 
     args_list = [update_dict(default_args,
                              {'outputfile': 'mut{0}_{0}'.format(mut, method),
                              'use_mut': bool(mut),
                              'estimator': method})
-                 for method in ['rdgcv', 'svm', 'par']
+                 for method in ['rdgcv', 'par']
                  for mut in [0, 1]]
 
     if multi_threaded:

@@ -199,19 +199,35 @@ def training_score(X, Y):
     return mean([spearmanr(x, y)[0] for x, y in zip(X, Y)])
 
 
-def split_datasets(datasets, use_cnv):
-    exp_train_data = datasets['exp_train_data'].iloc[:,::3].join(datasets['exp_train_data'].iloc[:,1::3])
-    datasets['exp_board_data'] = datasets['exp_train_data'].iloc[:,2::3]
+def split_datasets(datasets, use_cnv, use_mut):
+
+    idx_train = [0,   1,   2,   3,   8,   9,  10,  12,  14,  16,  21,  23,  24,
+                 25,  27,  28,  29,  30,  32,  34,  36,  37,  38,  39,  40,  42,
+                 43,  44,  45,  47,  48,  49,  52,  53,  56,  57,  58,  59,  60,
+                 61,  62,  63,  64,  66,  67,  68,  69,  70,  73,  75,  80,  82,
+                 83,  84,  88,  90,  91,  92,  94,  95,  96,  98,  99, 100, 102, 103]
+
+    idx_board = [4,   5,   6,   7,  11,  13,  15,  17,  18,  19,  20,  22,  26,
+                 31,  33,  35,  41,  46,  50,  51,  54,  55,  65,  71,  72,  74,
+                 76,  77,  78,  79,  81,  85,  86,  87,  89,  93,  97, 101, 104]
+
+    exp_train_data = datasets['exp_train_data'][idx_train]
+    datasets['exp_board_data'] = datasets['exp_train_data'][idx_board]
     datasets['exp_train_data'] = exp_train_data
 
-    ess_train_data = datasets['ess_train_data'].iloc[:,::3].join(datasets['ess_train_data'].iloc[:,1::3])
-    datasets['ess_score_data'] = datasets['ess_train_data'].iloc[:,2::3]
+    ess_train_data = datasets['ess_train_data'][idx_train]
+    datasets['ess_score_data'] = datasets['ess_train_data'][idx_board]
     datasets['ess_train_data'] = ess_train_data
 
     if use_cnv:
-        cnv_train_data = datasets['cnv_train_data'].iloc[:,::3].join(datasets['cnv_train_data'].iloc[:,1::3])
-        datasets['cnv_board_data'] = datasets['cnv_train_data'].iloc[:,2::3]
+        cnv_train_data = datasets['cnv_train_data'][idx_train]
+        datasets['cnv_board_data'] = datasets['cnv_train_data'][idx_board]
         datasets['cnv_train_data'] = cnv_train_data
+
+    if use_mut:
+        mut_train_data = datasets['mut_train_data'][idx_train]
+        datasets['mut_board_data'] = datasets['mut_train_data'][idx_board]
+        datasets['mut_train_data'] = mut_train_data
 
 
 def pipeline(args):
@@ -236,9 +252,9 @@ def pipeline(args):
     gene_list = datasets['gene_list']
 
     if split_train_set:
-        split_datasets(datasets, use_cnv)
+        split_datasets(datasets, use_cnv, use_mut)
 
-    print 'pre-processing with:', filter_method, 'at', filter_threshold, 'normalize:', normalize
+    print 'pre-processing with:', filter_method, 'at', filter_threshold, 'normalize:', normalize, 'use_cnv', use_cnv, 'use_mut', use_mut
 
     pre_process_datasets(datasets, filter_method, filter_threshold, normalize, use_cnv)
 
