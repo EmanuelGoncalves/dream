@@ -9,8 +9,10 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.feature_selection import SelectKBest, f_regression
 from sklearn.cross_validation import ShuffleSplit
 from sklearn.metrics import make_scorer
+from sklearn.svm import *
+from sklearn.neural_network import BernoulliRBM
 from pandas import DataFrame, Series
-from dream_2014_functions import read_data_sets
+from dream_2014_functions import read_data_sets, leader_board_cell_lines, training_cell_lines
 
 
 def spearm_cor_func(expected, pred):
@@ -20,13 +22,13 @@ def spearm_cor_func(expected, pred):
 exp, cnv, ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
 # Split training data-set in two
-train_exp = exp.iloc[range(0, 50), ]
-train_cnv = cnv.iloc[range(0, 50), ]
-train_ess = ess.iloc[range(0, 50), ]
+train_exp = exp.loc[training_cell_lines, ]
+train_cnv = cnv.loc[training_cell_lines, ]
+train_ess = ess.loc[training_cell_lines, ]
 
-pred_exp = exp.iloc[range(51, 66), ]
-pred_cnv = cnv.iloc[range(51, 66), ]
-pred_ess = ess.iloc[range(51, 66), ].T
+pred_exp = exp.loc[leader_board_cell_lines, ]
+pred_cnv = cnv.loc[leader_board_cell_lines, ]
+pred_ess = ess.loc[leader_board_cell_lines, ].T
 
 # Predicted genes
 samples = pred_ess.axes[1]
@@ -35,10 +37,23 @@ samples = pred_ess.axes[1]
 X_train_pre = train_exp
 X_test_pre = pred_exp
 
-var_thres = 0.65
-filter_thres = VarianceThreshold(var_thres).fit(X_train_pre)
-X_train_pre = X_train_pre.loc[:, filter_thres.get_support()]
-X_test_pre = X_test_pre.loc[:, filter_thres.get_support()]
+# Filter by coeficient variation
+var_thres = VarianceThreshold(.625).fit(X_train_pre)
+X_train_pre = X_train_pre.loc[:, var_thres.get_support()]
+X_test_pre = X_test_pre.loc[:, var_thres.get_support()]
+
+# Filter by correlation
+features = X_train_pre.columns.values
+
+train_exp_corcoef = np.corrcoef(X_train_pre.T)
+train_exp_corcoef = np.triu(train_exp_corcoef)
+train_exp_corcoef = np.where(train_exp_corcoef > 0.80)
+
+train_exp_corcoef = [(train_exp_corcoef[0][i], train_exp_corcoef[1][i]) for i in range(len(train_exp_corcoef[0])) if train_exp_corcoef[0][i] != train_exp_corcoef[1][i]]
+features_to_remove = set(X_train_pre.columns[x[1]] for x in train_exp_corcoef)
+
+X_train_pre = X_train_pre.drop(features_to_remove, 1)
+X_test_pre = X_test_pre.drop(features_to_remove, 1)
 
 # Prepare features
 features = X_train_pre.columns
@@ -51,7 +66,7 @@ for gene in prioritized_genes:
     X_test = X_test_pre
 
     # Feature selection
-    fs = SelectKBest(f_regression, k=100)
+    fs = SelectKBest(f_regression, k=150)
     X_train = fs.fit_transform(X_train, y_train)
     X_test = fs.transform(X_test)
     gene_features = features[fs.get_support()]
@@ -75,21 +90,10 @@ X_test = X_test_pre.loc[:, important_features_top_100]
 for gene in prioritized_genes:
     y_train = train_ess.ix[:, gene]
 
-    y_preds_test = []
-    y_preds_scores = []
-
-    # Training
-    cv = ShuffleSplit(len(y_train), n_iter=5)
-    for train_i, test_i in cv:
-        clf = PassiveAggressiveRegressor(epsilon=0.01, n_iter=3).fit(X_train.ix[train_i, :], y_train[train_i])
-        y_preds_scores.append(spearm_cor_func(clf.predict(X_train.ix[test_i, :]), y_train[test_i]))
-        y_preds_test.append(clf.predict(X_test))
-
-    y_preds_scores = Series(y_preds_scores)
-    y_preds_test = DataFrame(y_preds_test)
-
-    # Predict
-    y_pred = np.mean(y_preds_test[y_preds_scores.notnull()], axis=0).values
+    y_pred = np.mean([
+        PassiveAggressiveRegressor(epsilon=0.01, n_iter=3).fit(X_train, y_train).predict(X_test),
+        RidgeCV(normalize=True).fit(X_train, y_train).predict(X_test),
+    ], axis=0)
 
     print gene, X_train.shape
 

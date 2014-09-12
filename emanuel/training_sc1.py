@@ -1,9 +1,9 @@
 __author__ = 'emanuel'
 
-# Set-up workspace
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.stats import spearmanr
+from scipy.cluster.vq import kmeans2
 from scipy.stats import boxcox
 from statsmodels.distributions import ECDF as ecdf
 from sklearn.linear_model import *
@@ -17,6 +17,8 @@ from sklearn.pipeline import Pipeline, FeatureUnion
 from sklearn.feature_selection import *
 from sklearn.isotonic import IsotonicRegression
 from sklearn.ensemble import *
+from sklearn.tree import *
+from sklearn.neural_network import *
 from sklearn.tree import DecisionTreeRegressor
 from sklearn.cross_decomposition import PLSRegression
 from sklearn.manifold import *
@@ -24,9 +26,10 @@ from sklearn.svm import *
 from sklearn.cross_decomposition import PLSCanonical, PLSRegression, CCA
 from sklearn.cross_validation import *
 from sklearn.metrics import *
+from sklearn.neighbors import *
 from sklearn.feature_selection import f_regression, SelectKBest, chi2
 from pandas import DataFrame, Series
-from dream_2014_functions import read_data_sets, read_annotations
+from dream_2014_functions import read_data_sets, leader_board_cell_lines, training_cell_lines
 
 
 def hill_function(matrix, hill_coef=7):
@@ -60,17 +63,35 @@ def ecdf_norm(matrix):
         norm_matrix.loc[:, column] = ecdf(matrix.loc[:, column])(matrix.loc[:, column])
     return norm_matrix
 
+
+def discretise_kmeans(matrix, n_cluster=3):
+    matrix_discrete = DataFrame(
+        [kmeans2(matrix.ix[:, i].values, n_cluster)[1] for i in range(matrix.shape[1])],
+        index=matrix.columns,
+        columns=matrix.index
+    )
+
+    return matrix_discrete.T
+
+
+def f_regression_aux (X_test, y_train, center=False):
+    return f_regression(X_test, y_train, center)
+
 # Import data-sets
 exp, cnv, ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
-# Split training data-set in two
-train_exp = exp.iloc[range(26, 66), ]
-train_cnv = cnv.iloc[range(26, 66), ]
-train_ess = ess.iloc[range(26, 66), ]
+# Remove columns names with NaNs
+exp = exp.loc[:, [str(x) != 'nan' for x in exp.columns]]
+leader_exp = leader_exp.loc[:, [str(x) != 'nan' for x in leader_exp.columns]]
 
-pred_exp = exp.iloc[range(25), ]
-pred_cnv = cnv.iloc[range(25), ]
-pred_ess = ess.iloc[range(25), ].T
+# Split training data-set in two
+train_exp = exp.loc[training_cell_lines, ]
+train_cnv = cnv.loc[training_cell_lines, ]
+train_ess = ess.loc[training_cell_lines, ]
+
+pred_exp = exp.loc[leader_board_cell_lines, ]
+pred_cnv = cnv.loc[leader_board_cell_lines, ]
+pred_ess = ess.loc[leader_board_cell_lines, ].T
 
 # Predicted genes
 genes = pred_ess.axes[0]
@@ -84,18 +105,41 @@ spearman = make_scorer(spearm_cor_func, greater_is_better=True)
 X_train_pre = train_exp
 X_test_pre = pred_exp
 
-# Filter by coeficient variation
-var_thres = VarianceThreshold(0.8).fit(X_train_pre)
-X_train_pre = var_thres.transform(X_train_pre)
-X_test_pre = var_thres.transform(X_test_pre)
+best_epsilon = 0.01
+best_n_iter = 3
+best_k = 3500
 
+# Filter by coeficient variation
 # features_to_keep = X_train_pre.std() / X_train_pre.mean() > 0.1
 # X_train_pre = X_train_pre.loc[:, features_to_keep.values]
 # X_test_pre = X_test_pre.loc[:, features_to_keep.values]
 
-#X_train_pre = train_exp.join(train_cnv)
-#X_test_pre = pred_exp.join(pred_cnv)
+var_thres = VarianceThreshold(.625).fit(train_exp)
+train_exp = train_exp.loc[:, var_thres.get_support()]
+pred_exp = pred_exp.loc[:, var_thres.get_support()]
 
+var_thres = VarianceThreshold(.2).fit(train_cnv)
+train_cnv = train_cnv.loc[:, var_thres.get_support()]
+pred_cnv = pred_cnv.loc[:, var_thres.get_support()]
+
+# X_train_pre = train_exp.join(train_cnv, rsuffix='_cnv')
+# X_test_pre = pred_exp.join(pred_cnv, rsuffix='_cnv')
+
+X_train_pre = train_exp
+X_test_pre = pred_exp
+
+# Filter by correlation
+train_exp_corcoef = np.corrcoef(X_train_pre.T)
+train_exp_corcoef = np.triu(train_exp_corcoef)
+train_exp_corcoef = np.where(train_exp_corcoef > 0.85)
+
+train_exp_corcoef = [(train_exp_corcoef[0][i], train_exp_corcoef[1][i]) for i in range(len(train_exp_corcoef[0])) if train_exp_corcoef[0][i] != train_exp_corcoef[1][i]]
+features_to_remove = set(X_train_pre.columns[x[1]] for x in train_exp_corcoef)
+
+X_train_pre = X_train_pre.drop(features_to_remove, 1)
+X_test_pre = X_test_pre.drop(features_to_remove, 1)
+
+corrs = []
 
 for gene in genes:
     # Assemble prediction variables
@@ -103,59 +147,28 @@ for gene in genes:
     y_train = train_ess.ix[:, gene].values
     X_test = X_test_pre
 
-    # Grid search cv
-    # pipeline = Pipeline([
-    #     ('fs', SelectKBest(f_regression)),
-    #     ('clf', PassiveAggressiveRegressor())
-    # ])
-    #
-    # parameters = {
-    #     'fs__k': [2000, 2500, 3000, 3500, 4000, 4500],
-    #     'clf__epsilon': [1e-12, 1e-9, 1e-4, 1e-3, 1e-2, .1]
-    # }
-    #
-    # clf = GridSearchCV(pipeline, parameters, scoring=spearman)
-    # clf.fit(X_train, y_train)
-    #
-    # best_k = clf.best_estimator_.get_params()['fs__k']
-    # best_epsilon = clf.best_estimator_.get_params()['clf__epsilon']
-    best_k = 2500
-    best_epsilon = 0.01
-    best_n_iter = 3
-
     # Feature selection
     fs = SelectKBest(f_regression, k=best_k).fit(X_train, y_train)
-    X_train = fs.transform(X_train_pre)
-    X_test = fs.transform(X_test_pre)
+    X_train = X_train.loc[:, fs.get_support()]
+    X_test = X_test.loc[:, fs.get_support()]
 
-    y_preds_test = []
-    y_preds_scores = []
+    y_pred = np.mean([
+        PassiveAggressiveRegressor(epsilon=0.01, n_iter=3).fit(X_train, y_train).predict(X_test),
+        RidgeCV(normalize=True).fit(X_train, y_train).predict(X_test),
+        NuSVR().fit(X_train, y_train).predict(X_test),
+    ], axis=0)
 
-    # Training
-    cv = ShuffleSplit(len(y_train), n_iter=10)
-    for train_i, test_i in cv:
-        clf = PassiveAggressiveRegressor(epsilon=best_epsilon, n_iter=best_n_iter).fit(X_train[train_i], y_train[train_i])
-        y_preds_scores.append(spearm_cor_func(clf.predict(X_train[test_i]), y_train[test_i]))
-        y_preds_test.append(clf.predict(X_test))
-
-    y_preds_scores = Series(y_preds_scores)
-    y_preds_test = DataFrame(y_preds_test)
-
-    # Predict
-    y_pred = np.mean(y_preds_test[y_preds_scores.notnull()], axis=0).values
-    # predictions.loc[gene, :] = y_preds_test.ix[y_preds_scores.argmax()].values
+    # y_pred = PassiveAggressiveRegressor(epsilon=best_epsilon, n_iter=best_n_iter).fit(X_train, y_train).predict(X_test)
+    # y_pred = RidgeCV(normalize=True).fit(X_train, y_train).predict(X_test)
 
     predictions.loc[gene, :] = y_pred
 
-    if spearmanr(predictions.loc[gene, :], pred_ess.loc[gene])[0] < -0.20:
-        print gene
-
-print predictions
+    cor = spearmanr(predictions.loc[gene, :], pred_ess.loc[gene])[0]
+    corrs.append(cor)
+    print gene, X_train.shape, cor, '\t\t', np.mean(corrs)
 
 # Calculate score
-correlations = []
-for gene in genes:
-    correlations.append(spearmanr(predictions.loc[gene], pred_ess.loc[gene])[0])
+correlations = [spearmanr(predictions.loc[gene], pred_ess.loc[gene])[0] for gene in genes]
 
 # Register run result
 score = '%.5f' % np.mean(correlations)

@@ -1,53 +1,89 @@
 __author__ = 'emanuel'
 
 import numpy as np
+import re
 from scipy.stats import spearmanr
 import matplotlib.pyplot as plt
 from sklearn.linear_model import *
 from sklearn.svm import *
 from sklearn.pipeline import *
-from sklearn.preprocessing import StandardScaler
-from sklearn.feature_selection import VarianceThreshold, SelectKBest, f_regression
+from sklearn.preprocessing import *
+from sklearn.feature_selection import *
 from sklearn.grid_search import GridSearchCV
-from sklearn.cross_validation import ShuffleSplit
+from sklearn.cross_validation import *
 from sklearn.ensemble import *
 from sklearn.tree import *
-from sklearn.metrics import make_scorer
-from pandas import DataFrame, Series
-from dream_2014_functions import read_data_sets
+from sklearn.neighbors import *
+from sklearn.neural_network import BernoulliRBM
+from sklearn.gaussian_process import *
+from sklearn.cross_decomposition import *
+from sklearn.metrics import *
+from sklearn.isotonic import *
+from sklearn.cluster import *
+from scipy.spatial.distance import pdist, squareform
+from scipy.cluster.hierarchy import linkage, dendrogram
+from pandas import DataFrame, Series, read_csv
+from dream_2014_functions import read_data_sets, leader_board_cell_lines, training_cell_lines, read_gene_neighbours
 
 
 def spearm_cor_func(expected, pred):
     return spearmanr(expected, pred)[0]
 
 
-def hill_function(matrix, hill_coef=2):
+def hill_function(matrix, hill_coef=4):
     return 1 / ((np.median(matrix, axis=0) / matrix) ** hill_coef + 1)
+
+
+def count_outliers(matrix):
+    outliers_counts = []
+    for i in range(len(matrix.columns)):
+        Q1 = np.percentile(matrix.ix[:, i], 25)
+        Q3 = np.percentile(matrix.ix[:, i], 75)
+        IQR = Q3 - Q1
+
+        outliers_counts.append(sum(matrix.ix[:, i] < (Q1 - 1.5 * IQR)) + sum(matrix.ix[:, i] > (Q3 + 1.5 * IQR)))
+
+    return outliers_counts
 
 # Import data-sets
 exp, cnv, ess, leader_exp, leader_cnv, prioritized_genes = read_data_sets()
 
 # Split training data-set in two
-train_exp = exp.iloc[range(26, 66), ]
-train_cnv = cnv.iloc[range(26, 66), ]
-train_ess = ess.iloc[range(26, 66), ]
+train_exp = exp.loc[training_cell_lines, ]
+train_cnv = cnv.loc[training_cell_lines, ]
+train_ess = ess.loc[training_cell_lines, ]
 
-pred_exp = exp.iloc[range(25), ]
-pred_cnv = cnv.iloc[range(25), ]
-pred_ess = ess.iloc[range(25), ].T
-
-X_train_pre = train_exp
-X_test_pre = pred_exp
+pred_exp = exp.loc[leader_board_cell_lines, ]
+pred_cnv = cnv.loc[leader_board_cell_lines, ]
+pred_ess = ess.loc[leader_board_cell_lines, ].T
 
 # Configurations
 predictions = DataFrame(None, index=prioritized_genes, columns=pred_ess.axes[1])
 spearman = make_scorer(spearm_cor_func, greater_is_better=True)
+predictions_features = {}
+
+X_train_pre = train_exp
+X_test_pre = pred_exp
 
 # Filter by coeficient variation
-var_thres = 0.60
-filter_thres = VarianceThreshold(var_thres).fit(X_train_pre)
-X_train_pre = filter_thres.transform(X_train_pre)
-X_test_pre = filter_thres.transform(X_test_pre)
+var_thres = VarianceThreshold(.65).fit(X_train_pre)
+X_train_pre = X_train_pre.loc[:, var_thres.get_support()]
+X_test_pre = X_test_pre.loc[:, var_thres.get_support()]
+
+# Filter by correlation
+# features = X_train_pre.columns.values
+#
+# train_exp_corcoef = np.corrcoef(X_train_pre.T)
+# train_exp_corcoef = np.triu(train_exp_corcoef)
+# train_exp_corcoef = np.where(train_exp_corcoef > 0.80)
+#
+# train_exp_corcoef = [(train_exp_corcoef[0][i], train_exp_corcoef[1][i]) for i in range(len(train_exp_corcoef[0])) if train_exp_corcoef[0][i] != train_exp_corcoef[1][i]]
+# features_to_remove = set(X_train_pre.columns[x[1]] for x in train_exp_corcoef)
+#
+# X_train_pre = X_train_pre.drop(features_to_remove, 1)
+# X_test_pre = X_test_pre.drop(features_to_remove, 1)
+
+corrs = []
 
 for gene in prioritized_genes:
     # Assemble prediction variables
@@ -56,33 +92,22 @@ for gene in prioritized_genes:
     X_test = X_test_pre
 
     fs = SelectKBest(f_regression).fit(X_train, y_train)
-    X_train = fs.transform(X_train)
-    X_test = fs.transform(X_test)
+    X_train = X_train.loc[:, fs.get_support()]
+    X_test = X_test.loc[:, fs.get_support()]
 
-    y_preds_test = []
-    y_preds_scores = []
+    y_pred = np.mean([
+        PassiveAggressiveRegressor(epsilon=0.01, n_iter=3).fit(X_train, y_train).predict(X_test),
+        RidgeCV(normalize=True).fit(X_train, y_train).predict(X_test),
+    ], axis=0)
 
-    # Training
-    cv = ShuffleSplit(len(y_train), n_iter=5)
-    for train_i, test_i in cv:
-        clf = RidgeCV(gcv_mode='auto').fit(X_train[train_i], y_train[train_i])
-        y_preds_scores.append(spearm_cor_func(clf.predict(X_train[test_i]), y_train[test_i]))
-        y_preds_test.append(clf.predict(X_test))
+    predictions.loc[gene, :] = y_pred
 
-    y_preds_scores = Series(y_preds_scores)
-    y_preds_test = DataFrame(y_preds_test)
-
-    # Predict
-    y_pred = np.mean(y_preds_test[y_preds_scores.notnull()], axis=0).values
-
-    predictions.ix[gene] = y_pred
-
-    print gene, X_train.shape, spearmanr(predictions.loc[gene, :], pred_ess.loc[gene])
+    cor = spearmanr(predictions.loc[gene, :], pred_ess.loc[gene])[0]
+    corrs.append(cor)
+    print gene, X_train.shape, cor, '\t\t', np.mean(corrs)
 
 # Calculate score
-correlations = []
-for gene in prioritized_genes:
-    correlations.append(spearmanr(predictions.loc[gene], pred_ess.loc[gene])[0])
+correlations = [spearmanr(predictions.loc[gene], pred_ess.loc[gene])[0] for gene in prioritized_genes]
 
 # Register run result
 score = '%.5f' % np.mean(correlations)
