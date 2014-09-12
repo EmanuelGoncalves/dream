@@ -8,6 +8,7 @@
   df
   # for expression: columns are Probe_Name, Gene_Name
   # for copy number: columns are Gene_name, Num_chr, txStart, txEnd
+  # for cell lines: Name, Alias, Type, Site_primary
 }
 
 "read.features.list" = function(filename) {
