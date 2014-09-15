@@ -3,7 +3,6 @@ source("miguel-R/norm.R")
 
 library(e1071)
 
-sink("res-svm-4.txt")
 res.svm.4 = matrix(NA, nrow(input.ts.mat.2), ncol(output.tr.mat.2))
 nf = 500
 for (g in 1:ncol(output.tr.mat.2) ) {
@@ -16,4 +15,3 @@ for (g in 1:ncol(output.tr.mat.2) ) {
 }
 
 obj.function(output.ts.mat.2, res.svm.4)
-sink()
