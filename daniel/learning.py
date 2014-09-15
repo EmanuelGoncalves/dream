@@ -6,7 +6,7 @@ from numpy.random import randn
 from scipy.stats import spearmanr
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.preprocessing import StandardScaler
-from sklearn.svm import SVR
+from sklearn.svm import SVR, NuSVR
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso, ElasticNet, PassiveAggressiveRegressor, \
     RidgeCV, LassoCV, ElasticNetCV, MultiTaskLasso, MultiTaskElasticNet
 from sklearn.feature_selection import RFE, SelectKBest, f_regression, VarianceThreshold
@@ -18,6 +18,7 @@ from datasets import RESULTS_FOLDER
 
 ESTIMATORS = {'knn': KNeighborsRegressor,
               'svm': SVR,
+              'nusvm': NuSVR,
               'lr': LinearRegression,
               'lgr': LogisticRegression,
               'par': PassiveAggressiveRegressor,
@@ -34,7 +35,7 @@ ESTIMATORS = {'knn': KNeighborsRegressor,
 class WisdomOfCrowds():
 
     def __init__(self, estimators):
-        self.estimators = [ESTIMATORS[estimator]() for estimator in estimators]
+        self.estimators = [ESTIMATORS[estimator](**args) for estimator, args in estimators.items()]
 
     def fit(self, X, y):
         [estimator.fit(X, y) for estimator in self.estimators]
@@ -222,9 +223,13 @@ def split_datasets(datasets, use_cnv, use_mut):
                  61,  62,  63,  64,  66,  67,  68,  69,  70,  73,  75,  80,  82,
                  83,  84,  88,  90,  91,  92,  94,  95,  96,  98,  99, 100, 102, 103]
 
-    idx_board = [4,   5,   6,   7,  11,  13,  15,  17,  18,  19,  20,  22,  26,
-                 31,  33,  35,  41,  46,  50,  51,  54,  55,  65,  71,  72,  74,
-                 76,  77,  78,  79,  81,  85,  86,  87,  89,  93,  97, 101, 104]
+    # idx_board = [4,   5,   6,   7,  11,  13,  15,  17,  18,  19,  20,  22,  26,
+    #              31,  33,  35,  41,  46,  50,  51,  54,  55,  65,  71,  72,  74,
+    #              76,  77,  78,  79,  81,  85,  86,  87,  89,  93,  97, 101, 104]
+
+    idx_board = [5,   6,   7,  11,  13,  15,  17,  19,  20,  22,  26,  33,  41,
+                 46,  50,  51,  54,  55,  65,  71,  74,  76,  77,  78,  79,  81,
+                 85,  86,  87,  89,  97, 101, 104]
 
     exp_train_data = datasets['exp_train_data'][idx_train]
     datasets['exp_board_data'] = datasets['exp_train_data'][idx_board]
@@ -284,7 +289,7 @@ def pipeline(args):
     if max_predictions and split_train_set:
         Y = Y[::len(Y)/max_predictions][:max_predictions]
 
-    print 'predicting with', feature_selection, '(', n_features, ')',  estimator,
+    print 'predicting with', feature_selection, '(', n_features, ')',  estimator, estimation_args,
 
     t0 = time()
     if sc == 'sc1':
@@ -310,6 +315,7 @@ def pipeline(args):
             W0 = W0[::len(W0)/max_predictions][:max_predictions]
         score = training_score(W0, W)
         print 'scored:', score
+        print
 
     else:
         index = ess_train_data.index if sc == 'sc1' else gene_list
