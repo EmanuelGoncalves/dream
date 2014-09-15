@@ -6,7 +6,7 @@ k = 1
 res.our.knn.1 = matrix(NA, nrow(input.ts.mat.2), ncol(output.tr.mat.2))
 for(cl in 1:nrow(res.our.knn.1)) {
   bestK = order(correl.mat[cl,], decreasing = T)[1:k]
-  res.our.knn.1[cl,] = colMeans(output.tr.mat.2[bestK,])
+  res.our.knn.1[cl,] = colMeans(output.tr.mat.2[bestK,,drop=F])
 }
 
 obj.knn.1 = obj.function(output.ts.mat.2, res.our.knn.1)
