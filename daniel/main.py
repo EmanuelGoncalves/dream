@@ -15,14 +15,14 @@ def run_pipeline():
 
     default_args = {
         'phase': 'phase3',                # challenge phase
-        'sc': 'sc1',                      # sub-challenge
+        'sc': 'sc3',                      # sub-challenge
         'filter': 'var',                  # filtering method (None / variance / coefficient of variation)
         'filter_threshold': (0.65, 1),    # filter threshold (gene expression, copy number varation)
         'use_cnv': False,                 # use copy number variation ?
         'use_mut': False,                 # use mutation data ?
-        'normalize': False,                # normalize features ?
+        'normalize': False,               # normalize features ?
         'feature_selection': 'kb',        # feature selection (None / KBest (kb) / Recursive Feature Elimination (rfe))
-        'n_features': 3500,               # select number of maximum features
+        'n_features': 30,                 # select number of maximum features
         'selection_args': {},             # args to pass to feature selection method
         'estimator': 'woc',               # estimation method (knn, svm, lr, lgr, par, rdg, lss, eln, rdgcv, lsscv, elncv, mtlss, mteln)
         'estimation_args': {},            # args to pass to estimation method
@@ -33,10 +33,8 @@ def run_pipeline():
     }
 
     args_list = [update_dict(default_args,
-                             {'estimation_args': {'estimators': combinations} } )
-                 for combinations in [['rdgcv'],
-                                      ['par'],
-                                      ['rdgcv', 'par']]]
+                             {'estimation_args': {'estimators': estimators}})
+                 for estimators in [{'nusvm': {}, 'rdgcv': {'normalize': True}, 'par': {'epsilon': 0.01}}]]
 
     if multi_threaded:
         p = Pool()
