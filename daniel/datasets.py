@@ -8,7 +8,8 @@ PROJECT_ID = 'syn2549343'
 TEAM = 'UM-EBI'
 
 #CODES = {'sc1': '2468319', 'sc2': '2468322', 'sc3': '2482339'}
-CODES = {'sc1': '2571160', 'sc2': '2571162', 'sc3': '2571164'}
+#CODES = {'sc1': '2571160', 'sc2': '2571162', 'sc3': '2571164'}
+CODES = {'sc1': '2571166', 'sc2': '2571168', 'sc3': '2571170'}
 
 RESULTS_FOLDER = '../submissions/'
 
@@ -46,9 +47,14 @@ CELL_LINES_LEADERBOARD_PH3 = PHASE3_DATA + 'Cell_line_annotation_finaltest_phase
 PRIORITY_GENE_LIST_PH3 = PHASE3_DATA + 'prioritized_gene_list_phase3.txt'
 
 
-def load_gct_data(filename):
-    data = read_csv(filename, sep='\t', header=2, index_col=0)
-    del data['Description']
+def load_gct_data(filename, index_by_description=False):
+    if index_by_description:
+        data = read_csv(filename, sep='\t', header=2, index_col=1)
+        data = data.loc[[str(x) != 'nan' for x in data.index], :]
+        del data['Name']
+    else:
+        data = read_csv(filename, sep='\t', header=2, index_col=0)
+        del data['Description']
     return data
 
 

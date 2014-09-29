@@ -10,6 +10,7 @@ from sklearn.svm import SVR, NuSVR
 from sklearn.linear_model import LinearRegression, LogisticRegression, Ridge, Lasso, ElasticNet, PassiveAggressiveRegressor, \
     RidgeCV, LassoCV, ElasticNetCV, MultiTaskLasso, MultiTaskElasticNet
 from sklearn.feature_selection import RFE, SelectKBest, f_regression, VarianceThreshold
+from sklearn.cluster import FeatureAgglomeration
 from time import time
 
 from datasets import load_datasets, save_gct_data, submit_to_challenge, load_gene_list, zip_files
@@ -44,6 +45,49 @@ class WisdomOfCrowds():
         Ys = [estimator.predict(X) for estimator in self.estimators]
         return mean(Ys, 0)
 
+class MyRFE():
+
+    def __init__(self, estimator, n_features, step, p):
+        self.estimator = estimator
+        self.n_features = n_features
+        self.step = step
+        self.p = p
+        self.support = None
+
+    def fit(self, X, y):
+
+        support = range(X.shape[1])
+        X0 = X
+        while X.shape[1] > self.n_features:
+            new_size = max(int(X.shape[1]*self.step), self.n_features)
+
+            kbest = SelectKBest(f_regression, k=new_size)
+            kbest.fit(X, y)
+            score1 = kbest.scores_
+
+            self.estimator.fit(X, y)
+            score2 = abs(self.estimator.coef_)
+
+            score1 = score1 / max(score1)
+            score2 = (score2 / max(score2))**2
+
+            score = (1 - self.p) * score1 + self.p * score2
+
+            coefs = zip(score, support)
+            coefs = sorted(coefs, key=lambda (a,b): a, reverse=True)
+            support = [b for (a, b) in coefs[:new_size]]
+            X = X0[:, support]
+        self.estimator.fit(X, y)
+        self.support = support
+
+
+    def predict(self, X):
+        X = X[:, self.support]
+        return self.estimator.predict(X)
+
+
+
+
 ESTIMATORS['woc'] = WisdomOfCrowds
 
 def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normalize=True, use_cnv=False, use_mut=False):
@@ -55,7 +99,11 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
         cnv_train_data = datasets['cnv_train_data']
         cnv_board_data = datasets['cnv_board_data']
 
+#    from numpy import hstack
+#    tmp = hstack((exp_train_data.values, exp_board_data))
+
     if filter_method == 'cv':
+#        exp_cv = std(tmp, 1) / mean(tmp, 1)
         exp_cv = exp_train_data.std(1).values / exp_train_data.mean(1).values
         exp_train_data = exp_train_data.loc[exp_cv > threshold[0], :]
         exp_board_data = exp_board_data.loc[exp_cv > threshold[0], :]
@@ -67,6 +115,7 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
 
     if filter_method == 'var':
         selector = VarianceThreshold(threshold[0])
+#        selector.fit(tmp.T)
         selector.fit(exp_train_data.values.T)
         exp_train_data = exp_train_data.loc[selector.get_support(), :]
         exp_board_data = exp_board_data.loc[selector.get_support(), :]
@@ -104,12 +153,22 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
 def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_method, n_features, selection_args, estimator_args):
     W = []
     features = []
-    n_features = min(n_features, len(feature_list))
+
+    if selection_method != '2step_kbest':
+        n_features = min(n_features, len(feature_list))
 
     if estimator_method == 'svm' and selection_method == 'rfe':
         estimator_args['kernel'] = 'linear'
 
     estimator = ESTIMATORS[estimator_method](**estimator_args)
+
+    if selection_method == 'cluster':
+        agglom = FeatureAgglomeration(n_clusters=n_features, affinity='cosine', linkage='average')
+        clusters = agglom.fit_predict(X).tolist()
+        sample = [clusters.index(i) for i in range(n_features)]
+        X = X[:,sample]
+        Z = Z[:,sample]
+        selection_method = None
 
     if selection_method is None:
         for i, y in enumerate(Y):
@@ -130,7 +189,18 @@ def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_meth
             if (i+1) % (len(Y) / 10) == 0:
                 print '.',
 
-    if selection_method == 'kb':
+    if selection_method == 'myrfe':
+        selector = MyRFE(estimator=estimator, n_features=n_features, **selection_args)
+
+        for i, y in enumerate(Y):
+            selector.fit(X, y)
+            features.append(feature_list[selector.support])
+            w = selector.predict(Z)
+            W.append(w)
+            if (i+1) % (len(Y) / 10) == 0:
+                print '.',
+
+    if selection_method == 'kbest':
         selector = SelectKBest(f_regression, k=n_features, **selection_args)
         for i, y in enumerate(Y):
             X2 = selector.fit_transform(X, y)
@@ -138,6 +208,23 @@ def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_meth
             features.append(feature_list[selector.get_support()])
             estimator.fit(X2, y)
             w = estimator.predict(Z2)
+            W.append(w)
+            if (i+1) % (len(Y) / 10) == 0:
+                print '.',
+
+
+    if selection_method == '2step_kbest':
+        selector1 = SelectKBest(f_regression, k=n_features[0], **selection_args)
+        selector2 = SelectKBest(f_regression, k=n_features[1], **selection_args)
+        for i, y in enumerate(Y):
+            X2 = selector1.fit_transform(X, y)
+            Z2 = selector1.transform(Z)
+            feature_list2 = feature_list[selector1.get_support()]
+            X3 = selector2.fit_transform(X2, y)
+            Z3 = selector2.transform(Z2)
+            features.append(feature_list2[selector2.get_support()])
+            estimator.fit(X3, y)
+            w = estimator.predict(Z3)
             W.append(w)
             if (i+1) % (len(Y) / 10) == 0:
                 print '.',
@@ -166,7 +253,7 @@ def sc3_multitask(X, Y, Z, feature_list, selection_method, estimator_method, sel
         features = feature_list[selector.support_]
         W = selector.predict(Z)
 
-    if selection_method == 'kb':
+    if selection_method == 'kbest':
         print 'Cannot use KBest with multi task methods'
 
     return W.T, features
@@ -223,10 +310,6 @@ def split_datasets(datasets, use_cnv, use_mut):
                  61,  62,  63,  64,  66,  67,  68,  69,  70,  73,  75,  80,  82,
                  83,  84,  88,  90,  91,  92,  94,  95,  96,  98,  99, 100, 102, 103]
 
-    # idx_board = [4,   5,   6,   7,  11,  13,  15,  17,  18,  19,  20,  22,  26,
-    #              31,  33,  35,  41,  46,  50,  51,  54,  55,  65,  71,  72,  74,
-    #              76,  77,  78,  79,  81,  85,  86,  87,  89,  93,  97, 101, 104]
-
     idx_board = [5,   6,   7,  11,  13,  15,  17,  19,  20,  22,  26,  33,  41,
                  46,  50,  51,  54,  55,  65,  71,  74,  76,  77,  78,  79,  81,
                  85,  86,  87,  89,  97, 101, 104]
@@ -257,7 +340,7 @@ def pipeline(args):
     filter_threshold = args['filter_threshold']
     normalize = args['normalize']
     feature_selection = args['feature_selection']
-    n_features = args['n_features'] if sc != 'sc2' else 10
+    n_features = args['n_features']
     selection_args = args['selection_args']
     estimator = args['estimator']
     estimation_args = args['estimation_args']
@@ -289,7 +372,8 @@ def pipeline(args):
     if max_predictions and split_train_set:
         Y = Y[::len(Y)/max_predictions][:max_predictions]
 
-    print 'predicting with', feature_selection, '(', n_features, ')',  estimator, estimation_args,
+    print 'selection with', feature_selection, '(', n_features, ')', selection_args
+    print 'estimation with', estimator, estimation_args,
 
     t0 = time()
     if sc == 'sc1':
@@ -334,6 +418,6 @@ def pipeline(args):
             zip_files(outputfile, [outputfile + '.txt', outputfile + '.gct'])
 
         if submit:
-            label = 'daniel_' + outputfile
+            label = outputfile
             submit_to_challenge(outputfile, sc, label)
 
