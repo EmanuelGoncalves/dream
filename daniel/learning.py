@@ -86,8 +86,6 @@ class MyRFE():
         return self.estimator.predict(X)
 
 
-
-
 ESTIMATORS['woc'] = WisdomOfCrowds
 
 def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normalize=True, use_cnv=False, use_mut=False):
@@ -99,11 +97,8 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
         cnv_train_data = datasets['cnv_train_data']
         cnv_board_data = datasets['cnv_board_data']
 
-#    from numpy import hstack
-#    tmp = hstack((exp_train_data.values, exp_board_data))
 
     if filter_method == 'cv':
-#        exp_cv = std(tmp, 1) / mean(tmp, 1)
         exp_cv = exp_train_data.std(1).values / exp_train_data.mean(1).values
         exp_train_data = exp_train_data.loc[exp_cv > threshold[0], :]
         exp_board_data = exp_board_data.loc[exp_cv > threshold[0], :]
@@ -115,7 +110,6 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
 
     if filter_method == 'var':
         selector = VarianceThreshold(threshold[0])
-#        selector.fit(tmp.T)
         selector.fit(exp_train_data.values.T)
         exp_train_data = exp_train_data.loc[selector.get_support(), :]
         exp_board_data = exp_board_data.loc[selector.get_support(), :]
@@ -142,8 +136,6 @@ def pre_process_datasets(datasets, filter_method=None, threshold=(0, 0), normali
         scaler = StandardScaler().fit(feat_train_data.values.T)
         feat_train_data.values[:,:] = scaler.transform(feat_train_data.values.T).T
         feat_board_data.values[:,:] = scaler.transform(feat_board_data.values.T).T
-
-
 
     datasets['feat_train_data'] = feat_train_data
     datasets['feat_board_data'] = feat_board_data
@@ -212,23 +204,6 @@ def select_train_predict(X, Y, Z, feature_list, selection_method, estimator_meth
             if (i+1) % (len(Y) / 10) == 0:
                 print '.',
 
-
-    if selection_method == '2step_kbest':
-        selector1 = SelectKBest(f_regression, k=n_features[0], **selection_args)
-        selector2 = SelectKBest(f_regression, k=n_features[1], **selection_args)
-        for i, y in enumerate(Y):
-            X2 = selector1.fit_transform(X, y)
-            Z2 = selector1.transform(Z)
-            feature_list2 = feature_list[selector1.get_support()]
-            X3 = selector2.fit_transform(X2, y)
-            Z3 = selector2.transform(Z2)
-            features.append(feature_list2[selector2.get_support()])
-            estimator.fit(X3, y)
-            w = estimator.predict(Z3)
-            W.append(w)
-            if (i+1) % (len(Y) / 10) == 0:
-                print '.',
-
     print
 
     return W, features
@@ -284,18 +259,6 @@ def sc3_top100(X, Y, Z, feature_list, selection_method, estimation_method, n_fea
     print
 
     return W, top100
-
-
-def clean_bad_predictions(W):
-
-    bad = 0
-    for i, w in enumerate(W):
-        if std(w) < 1e-12:
-            W[i] = randn(*w.shape)
-            bad += 1
-
-    if bad:
-        print '* Warning:', bad, 'bad predictions out of', len(W)
 
 
 def training_score(X, Y):
@@ -389,7 +352,6 @@ def pipeline(args):
             W, features = sc3_top100(X, Y, Z, feature_list, feature_selection, estimator, n_features, selection_args, estimation_args)
 
     t1 = time() - t0
-    clean_bad_predictions(W)
 
     print 'tested', feature_selection,  estimator, 'elapsed', t1, 'secs'
 

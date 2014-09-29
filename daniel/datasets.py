@@ -108,16 +108,8 @@ def load_datasets(phase='phase2', get_cnv=False, get_mut=False):
         gene_list = PRIORITY_GENE_LIST_PH3
 
     datasets['ess_train_data'] = load_gct_data(ess_train_data)
-
     datasets['exp_train_data'] = load_gct_data(exp_train_data)
     datasets['exp_board_data'] = load_gct_data(exp_board_data)
-
-    # datasets['exp_train_data'] = load_gct_data(exp_train_data, True)
-    # datasets['exp_board_data'] = load_gct_data(exp_board_data, True)
-    # common_genes = set(datasets['exp_train_data'].index) & set(datasets['ess_train_data'].index)
-    # datasets['exp_train_data'] = datasets['exp_train_data'].loc[common_genes, :]
-    # datasets['exp_board_data'] = datasets['exp_board_data'].loc[common_genes, :]
-
     datasets['gene_list'] = load_gene_list(gene_list)
 
     if get_cnv:
